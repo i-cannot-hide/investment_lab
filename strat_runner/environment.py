@@ -1,95 +1,94 @@
-import csv
-from datetime import datetime
 from decimal import Decimal
+from pathlib import Path
 
-from models import Candle, Account, Context
+from data.loader import load_candles
+from models import Account, Candle, Context, Order
 from recorder import Recorder
 
 
 class Environment:
-
-    def __init__(
-        self,
-        strategy,
-        mock_executor,
-        data_file: str
-    ):
+    def __init__(self, strategy, mock_executor, data_file: str):
         self.strategy = strategy
         self.mock_executor = mock_executor
-        self.data_file = data_file
 
-        self.account = Account(
-            balances={
-                "USD": Decimal("10000")
-            }
-        )
-
+        project_dir = Path(__file__).parent
+        self.data_file = project_dir / data_file
+        self.account = Account(balances={"USD": Decimal("10000")})
         self.positions = []
-
-        self.recorder = Recorder(
-            "runs/run_001"
-        )
-
-
-    def load_candles(self):
-        candles = []
-
-        with open(self.data_file) as f:
-            reader = csv.DictReader(f)
-
-            for row in reader:
-                candles.append(
-                    Candle(
-                        time=datetime.fromisoformat(row["time"]),
-                        ticker=row["ticker"],
-                        open=Decimal(row["open"]),
-                        high=Decimal(row["high"]),
-                        low=Decimal(row["low"]),
-                        close=Decimal(row["close"]),
-                        volume=Decimal(row["volume"]),
-                    )
-                )
-
-        return candles
-
+        self.recorder = Recorder(project_dir / "runs/run_001")
 
     def run(self):
-        candles = self.load_candles()
-
+        candles = load_candles(self.data_file)
         history = []
 
         for step, candle in enumerate(candles):
-
             history.append(candle)
+            context = self._build_context(candle, history)
 
-            context = Context(
-                time=candle.time,
-                candles=history.copy(),
-                account=self.account,
-                positions=self.positions,
-                open_orders=[]
-            )
-
-            snapshot_path = self.recorder.save_snapshot(
-                step,
-                context
-            )
-
+            snapshot_path = self.recorder.save_snapshot(step, context)
             orders = self.strategy.decide(context)
-
-            self.recorder.record_event(
-                "STRATEGY_DECISION",
-                {
-                    "orders": str(orders),
-                    "source_snapshot": str(snapshot_path),
-                }
-            )
 
             self.mock_executor.execute(
                 orders,
                 self.account,
                 self.positions,
-                {
-                    candle.ticker: candle.close
-                }
+                {candle.ticker: candle.close},
             )
+
+            equity = self._mark_to_market(candle)
+            self.recorder.record_step(
+                self._step_record(step, candle, orders, equity, snapshot_path)
+            )
+
+    def _build_context(self, candle: Candle, history: list[Candle]) -> Context:
+        return Context(
+            time=candle.time,
+            candles=history.copy(),
+            account=self.account,
+            positions=self.positions,
+        )
+
+    def _mark_to_market(self, candle: Candle) -> Decimal:
+        equity = self.account.balances["USD"]
+
+        for position in self.positions:
+            equity += position.quantity * candle.close
+
+        return equity
+
+    def _step_record(
+        self,
+        step: int,
+        candle: Candle,
+        orders: list[Order],
+        equity: Decimal,
+        snapshot_path: Path,
+    ) -> dict:
+        return {
+            "step": step,
+            "time": str(candle.time),
+            "price": str(candle.close),
+            "decision": [
+                {
+                    "ticker": order.ticker,
+                    "side": order.side.value,
+                    "quantity": str(order.quantity),
+                    "order_type": order.order_type.value,
+                }
+                for order in orders
+            ],
+            "balances": {
+                currency: str(amount)
+                for currency, amount in self.account.balances.items()
+            },
+            "positions": [
+                {
+                    "ticker": position.ticker,
+                    "quantity": str(position.quantity),
+                    "average_price": str(position.average_price),
+                }
+                for position in self.positions
+            ],
+            "equity": str(equity),
+            "source_snapshot": str(snapshot_path),
+        }

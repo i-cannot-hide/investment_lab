@@ -11,7 +11,6 @@ class OrderSide(Enum):
 
 class OrderType(Enum):
     MARKET = "MARKET"
-    LIMIT = "LIMIT"
 
 
 @dataclass
@@ -22,7 +21,7 @@ class Candle:
     high: Decimal
     low: Decimal
     close: Decimal
-    volume: float
+    volume: Decimal
 
 
 @dataclass
@@ -51,4 +50,3 @@ class Context:
     candles: list[Candle]
     account: Account
     positions: list[Position]
-    open_orders: list[Order]

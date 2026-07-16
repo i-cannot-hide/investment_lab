@@ -4,13 +4,12 @@ from strategies.hold import HoldStrategy
 
 
 strategy = HoldStrategy()
-
 mock_executor = MockExecutor()
 
 environment = Environment(
     strategy,
     mock_executor,
-    "data/btc.csv"
+    "data/btc.csv",
 )
 
 environment.run()

@@ -1,28 +1,18 @@
 import json
-from dataclasses import asdict
 from pathlib import Path
+from dataclasses import asdict
 
 
 class Recorder:
 
     def __init__(self, folder: str):
         self.folder = Path(folder)
+
         self.snapshots_folder = self.folder / "snapshots"
+        self.steps_file = self.folder / "steps.jsonl"
 
         self.folder.mkdir(parents=True, exist_ok=True)
         self.snapshots_folder.mkdir(exist_ok=True)
-
-        self.events_file = self.folder / "events.jsonl"
-
-
-    def record_event(self, event_type: str, data: dict):
-        event = {
-            "type": event_type,
-            "data": data
-        }
-
-        with open(self.events_file, "a") as f:
-            f.write(json.dumps(event, default=str) + "\n")
 
 
     def save_snapshot(self, step: int, context):
@@ -37,3 +27,11 @@ class Recorder:
             )
 
         return path
+
+
+    def record_step(self, step_data: dict):
+        with open(self.steps_file, "a") as f:
+            f.write(
+                json.dumps(step_data, default=str)
+                + "\n"
+            )
