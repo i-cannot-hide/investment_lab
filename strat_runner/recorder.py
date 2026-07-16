@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 from dataclasses import asdict
+from shutil import rmtree
 
 
 class Recorder:
@@ -8,11 +9,13 @@ class Recorder:
     def __init__(self, folder: str):
         self.folder = Path(folder)
 
+        if self.folder.exists():
+            rmtree(self.folder)
+
         self.snapshots_folder = self.folder / "snapshots"
         self.steps_file = self.folder / "steps.jsonl"
 
-        self.folder.mkdir(parents=True, exist_ok=True)
-        self.snapshots_folder.mkdir(exist_ok=True)
+        self.snapshots_folder.mkdir(parents=True)
 
 
     def save_snapshot(self, step: int, context):

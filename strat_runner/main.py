@@ -9,7 +9,7 @@ mock_executor = MockExecutor()
 environment = Environment(
     strategy,
     mock_executor,
-    "data/btc.csv",
+    "data/preprocessed/btc.csv",
 )
 
 environment.run()
