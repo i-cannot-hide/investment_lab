@@ -10,3 +10,6 @@ __pycache__/
 data/raw/
 data/processed/
 
+strat_runner/runs/*
+!strat_runner/runs/.gitkeep
+
