@@ -108,6 +108,23 @@ def test_skips_when_no_btc_candles():
     assert strategy.decide(context) == []
 
 
+def test_buys_configured_ticker():
+    strategy = BuyBelowStrategy(target_price=3000, ticker="ETH")
+    context = make_context(
+        usd="1000",
+        candles={
+            "BTC": [make_candle("BTC", "25000")],
+            "ETH": [make_candle("ETH", "2000")],
+        },
+    )
+
+    orders = strategy.decide(context)
+
+    assert len(orders) == 1
+    assert orders[0].ticker == "ETH"
+    assert orders[0].quantity == Decimal("1000") / Decimal("2000")
+
+
 def test_skips_when_price_is_zero():
     strategy = BuyBelowStrategy()
 

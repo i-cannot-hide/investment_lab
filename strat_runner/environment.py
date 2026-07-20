@@ -6,6 +6,12 @@ from pathlib import Path
 from data.loader import group_candles_by_time, load_candles_many
 from models import Account, Candle, Context, Order
 from recorder import Recorder
+from run_registry import (
+    allocate_run_dir,
+    register_run,
+    strategy_assets,
+    strategy_params,
+)
 
 
 class Environment:
@@ -15,10 +21,12 @@ class Environment:
         mock_executor,
         data_files: str | list[str],
         full_debug_runs: bool = False,
+        interval: str = "1d",
     ):
         self.strategy = strategy
         self.mock_executor = mock_executor
         self.full_debug_runs = full_debug_runs
+        self.interval = interval
 
         project_dir = Path(__file__).parent
         if isinstance(data_files, str):
@@ -26,15 +34,16 @@ class Environment:
         self.data_files = [project_dir / path for path in data_files]
         self.account = Account(balances={"USD": Decimal("10000")})
         self.positions = []
-        strategy_name = type(strategy).__name__.removesuffix("Strategy").lower()
-        run_id = datetime.now().strftime("%y-%m-%d_%H-%M")
-        self.recorder = Recorder(
-            project_dir / "runs" / f"{strategy_name}_{run_id}",
-            full_debug_runs=full_debug_runs,
-        )
+
+        self.runs_dir = project_dir / "runs"
+        self.run_id, self.date_time, run_folder = allocate_run_dir(self.runs_dir)
+        self.recorder = Recorder(run_folder, full_debug_runs=full_debug_runs)
 
     def run(self):
         candles = load_candles_many(self.data_files)
+        if not candles:
+            raise ValueError("No candles loaded from data files")
+
         bars_by_time = group_candles_by_time(candles)
         history: dict[str, list[Candle]] = defaultdict(list)
         last_prices: dict[str, Decimal] = {}
@@ -61,6 +70,22 @@ class Environment:
             self.recorder.record_step(
                 self._step_record(step, time, last_prices, orders, equity, snapshot_path)
             )
+
+        times = list(bars_by_time)
+        register_run(
+            self.runs_dir,
+            {
+                "id": self.run_id,
+                "folder": self.recorder.folder.name,
+                "date_time": self.date_time,
+                "strategy": type(self.strategy).__name__.removesuffix("Strategy").lower(),
+                "assets": strategy_assets(self.strategy),
+                "params": strategy_params(self.strategy),
+                "start_date": times[0].strftime("%Y-%m-%d"),
+                "end_date": times[-1].strftime("%Y-%m-%d"),
+                "interval": self.interval,
+            },
+        )
 
     def _build_context(
         self, time: datetime, history: dict[str, list[Candle]]

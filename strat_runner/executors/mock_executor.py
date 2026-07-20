@@ -24,6 +24,14 @@ class MockExecutor:
             elif order.side == OrderSide.SELL:
                 self._sell(order, price, account, positions)
 
+    def _find_position(
+        self, positions: list[Position], ticker: str
+    ) -> tuple[int | None, Position | None]:
+        for index, position in enumerate(positions):
+            if position.ticker == ticker:
+                return index, position
+        return None, None
+
     def _buy(
         self, order: Order, price: Decimal, account: Account, positions: list[Position]
     ):
@@ -34,24 +42,34 @@ class MockExecutor:
 
         account.balances["USD"] -= cost
 
-        positions.append(
-            Position(ticker=order.ticker, quantity=order.quantity, average_price=price)
-        )
+        _, position = self._find_position(positions, order.ticker)
+        if position is None:
+            positions.append(
+                Position(
+                    ticker=order.ticker,
+                    quantity=order.quantity,
+                    average_price=price,
+                )
+            )
+            return
+
+        new_quantity = position.quantity + order.quantity
+        position.average_price = (
+            position.quantity * position.average_price + order.quantity * price
+        ) / new_quantity
+        position.quantity = new_quantity
 
     def _sell(
         self, order: Order, price: Decimal, account: Account, positions: list[Position]
     ):
-        for position in positions:
-            if position.ticker != order.ticker:
-                continue
+        index, position = self._find_position(positions, order.ticker)
+        if position is None or position.quantity < order.quantity:
+            raise ValueError(
+                f"Not enough quantity to sell {order.quantity} {order.ticker}"
+            )
 
-            if position.quantity < order.quantity:
-                raise ValueError(f"Not enough quantity to sell {order.quantity} {order.ticker}")
+        position.quantity -= order.quantity
+        account.balances["USD"] += order.quantity * price
 
-            position.quantity -= order.quantity
-
-            account.balances["USD"] += order.quantity * price
-
-            break
-
-        
+        if position.quantity == 0:
+            positions.pop(index)
