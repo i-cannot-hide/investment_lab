@@ -92,7 +92,7 @@ class Environment:
     ) -> Context:
         return Context(
             time=time,
-            candles={ticker: list(candles) for ticker, candles in history.items()},
+            candles=history,
             account=self.account,
             positions=self.positions,
         )

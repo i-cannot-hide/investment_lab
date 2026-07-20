@@ -53,6 +53,77 @@ def register_run(runs_dir: Path, entry: dict) -> None:
         f.write(json.dumps(entry, default=str) + "\n")
 
 
+def _normalize_assets(assets: str | list[str] | None) -> list[str] | None:
+    if assets is None:
+        return None
+    if isinstance(assets, str):
+        return [assets]
+    return [str(asset) for asset in assets]
+
+
+def find_entries(
+    runs_dir: Path,
+    *,
+    strategy: str | None = None,
+    id: str | None = None,
+    folder: str | None = None,
+    assets: str | list[str] | None = None,
+    params: dict | None = None,
+) -> list[dict]:
+    """Return registry entries matching any provided filters (all optional)."""
+    wanted_assets = _normalize_assets(assets)
+    matches = []
+
+    for entry in load_registry(runs_dir):
+        if strategy is not None and entry.get("strategy") != strategy:
+            continue
+        if id is not None and entry.get("id") != id:
+            continue
+        if folder is not None and entry.get("folder") != folder:
+            continue
+        if wanted_assets is not None and entry.get("assets") != wanted_assets:
+            continue
+        if params is not None:
+            entry_params = {
+                key: str(value) for key, value in entry.get("params", {}).items()
+            }
+            if any(entry_params.get(key) != str(value) for key, value in params.items()):
+                continue
+        matches.append(entry)
+
+    return matches
+
+
+def latest_entry(
+    runs_dir: Path,
+    *,
+    strategy: str | None = None,
+    id: str | None = None,
+    folder: str | None = None,
+    assets: str | list[str] | None = None,
+    params: dict | None = None,
+) -> dict:
+    matches = find_entries(
+        runs_dir,
+        strategy=strategy,
+        id=id,
+        folder=folder,
+        assets=assets,
+        params=params,
+    )
+    if not matches:
+        raise FileNotFoundError(
+            "No registry entries matched filters: "
+            f"strategy={strategy!r}, id={id!r}, folder={folder!r}, "
+            f"assets={assets!r}, params={params!r}"
+        )
+    return matches[-1]
+
+
+def steps_path(runs_dir: Path, entry: dict) -> Path:
+    return Path(runs_dir) / entry["folder"] / "steps.jsonl"
+
+
 def strategy_assets(strategy) -> list[str]:
     if hasattr(strategy, "tickers"):
         return [str(ticker) for ticker in strategy.tickers]
