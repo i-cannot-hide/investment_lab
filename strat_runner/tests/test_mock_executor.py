@@ -1,9 +1,10 @@
+from datetime import datetime
 from decimal import Decimal
 
 import pytest
 
 from executors.mock_executor import MockExecutor
-from models import Account, Order, OrderSide, OrderType, Position
+from models import Account, Candle, Order, OrderSide, OrderType, Position
 
 
 def make_order(side: OrderSide, quantity: str, ticker: str = "BTC") -> Order:
@@ -12,6 +13,19 @@ def make_order(side: OrderSide, quantity: str, ticker: str = "BTC") -> Order:
         side=side,
         quantity=Decimal(quantity),
         order_type=OrderType.MARKET,
+    )
+
+
+def make_candle(close: str, ticker: str = "BTC") -> Candle:
+    price = Decimal(close)
+    return Candle(
+        time=datetime(2021, 1, 1),
+        ticker=ticker,
+        open=price,
+        high=price,
+        low=price,
+        close=price,
+        volume=Decimal("1"),
     )
 
 
@@ -24,7 +38,7 @@ def test_buy_creates_position():
         [make_order(OrderSide.BUY, "2")],
         account,
         positions,
-        {"BTC": Decimal("100")},
+        {"BTC": make_candle("100")},
     )
 
     assert account.balances["USD"] == Decimal("9800")
@@ -43,13 +57,13 @@ def test_second_buy_merges_and_updates_average():
         [make_order(OrderSide.BUY, "1")],
         account,
         positions,
-        {"BTC": Decimal("100")},
+        {"BTC": make_candle("100")},
     )
     executor.execute(
         [make_order(OrderSide.BUY, "1")],
         account,
         positions,
-        {"BTC": Decimal("200")},
+        {"BTC": make_candle("200")},
     )
 
     assert len(positions) == 1
@@ -69,7 +83,7 @@ def test_partial_sell_keeps_average_price():
         [make_order(OrderSide.SELL, "1")],
         account,
         positions,
-        {"BTC": Decimal("150")},
+        {"BTC": make_candle("150")},
     )
 
     assert account.balances["USD"] == Decimal("150")
@@ -89,7 +103,7 @@ def test_full_sell_removes_position():
         [make_order(OrderSide.SELL, "2")],
         account,
         positions,
-        {"BTC": Decimal("150")},
+        {"BTC": make_candle("150")},
     )
 
     assert account.balances["USD"] == Decimal("300")
@@ -108,7 +122,7 @@ def test_sell_too_much_raises():
             [make_order(OrderSide.SELL, "2")],
             account,
             positions,
-            {"BTC": Decimal("150")},
+            {"BTC": make_candle("150")},
         )
 
 
@@ -122,7 +136,7 @@ def test_sell_unknown_ticker_raises():
             [make_order(OrderSide.SELL, "1")],
             account,
             positions,
-            {"BTC": Decimal("150")},
+            {"BTC": make_candle("150")},
         )
 
 
@@ -136,7 +150,7 @@ def test_buy_insufficient_balance_raises():
             [make_order(OrderSide.BUY, "1")],
             account,
             positions,
-            {"BTC": Decimal("100")},
+            {"BTC": make_candle("100")},
         )
 
 
@@ -152,7 +166,10 @@ def test_positions_for_different_tickers_stay_separate():
         ],
         account,
         positions,
-        {"BTC": Decimal("100"), "ETH": Decimal("50")},
+        {
+            "BTC": make_candle("100", ticker="BTC"),
+            "ETH": make_candle("50", ticker="ETH"),
+        },
     )
 
     assert len(positions) == 2
@@ -161,3 +178,28 @@ def test_positions_for_different_tickers_stay_separate():
     assert by_ticker["BTC"].average_price == Decimal("100")
     assert by_ticker["ETH"].quantity == Decimal("2")
     assert by_ticker["ETH"].average_price == Decimal("50")
+
+
+def test_market_fill_uses_candle_close():
+    account = Account(balances={"USD": Decimal("1000")})
+    positions: list[Position] = []
+    executor = MockExecutor()
+    candle = Candle(
+        time=datetime(2021, 1, 1),
+        ticker="BTC",
+        open=Decimal("90"),
+        high=Decimal("110"),
+        low=Decimal("80"),
+        close=Decimal("100"),
+        volume=Decimal("1"),
+    )
+
+    executor.execute(
+        [make_order(OrderSide.BUY, "1")],
+        account,
+        positions,
+        {"BTC": candle},
+    )
+
+    assert positions[0].average_price == Decimal("100")
+    assert account.balances["USD"] == Decimal("900")

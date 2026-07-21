@@ -57,14 +57,12 @@ class Environment:
 
         bars_by_time = group_candles_by_time(candles)
         history: dict[str, list[Candle]] = defaultdict(list)
-        last_prices: dict[str, Decimal] = {}
+        last_candles: dict[str, Candle] = {}
 
         for step, (time, bar_candles) in enumerate(bars_by_time.items()):
-            prices = {candle.ticker: candle.close for candle in bar_candles}
-            last_prices.update(prices)
-
             for candle in bar_candles:
                 history[candle.ticker].append(candle)
+                last_candles[candle.ticker] = candle
 
             context = self._build_context(time, history)
             snapshot_path = self.recorder.save_snapshot(step, context)
@@ -74,9 +72,12 @@ class Environment:
                 orders,
                 self.account,
                 self.positions,
-                last_prices,
+                last_candles,
             )
 
+            last_prices = {
+                ticker: candle.close for ticker, candle in last_candles.items()
+            }
             equity = self._mark_to_market(last_prices)
             self.recorder.record_step(
                 self._step_record(step, time, last_prices, orders, equity, snapshot_path)

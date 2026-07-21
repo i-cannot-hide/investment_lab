@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from models import Account, Order, OrderSide, Position, OrderType
+from models import Account, Candle, Order, OrderSide, Position, OrderType
 
 
 class MockExecutor:
@@ -9,15 +9,17 @@ class MockExecutor:
         orders: list[Order],
         account: Account,
         positions: list[Position],
-        prices: dict[str, Decimal],
+        candles: dict[str, Candle],
     ):
 
         for order in orders:
-            price = prices[order.ticker]
+            candle = candles[order.ticker]
 
             if order.order_type == OrderType.LIMIT:
                 raise NotImplementedError("Limit orders are not implemented")
 
+            price = candle.close
+            
             if order.side == OrderSide.BUY:
                 self._buy(order, price, account, positions)
 
