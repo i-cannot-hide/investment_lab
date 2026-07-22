@@ -228,3 +228,29 @@ def test_market_fill_uses_candle_close():
 
     assert positions[0].average_price == Decimal("100")
     assert account.balances["USD"] == Decimal("900")
+
+
+def test_market_total_value_sized_at_close_not_open():
+    account = Account(balances={"USD": Decimal("1000")})
+    positions: list[Position] = []
+    executor = MockExecutor()
+    candle = Candle(
+        time=datetime(2021, 1, 1),
+        ticker="BTC",
+        open=Decimal("50"),
+        high=Decimal("120"),
+        low=Decimal("40"),
+        close=Decimal("100"),
+        volume=Decimal("1"),
+    )
+
+    executor.execute(
+        [make_order(OrderSide.BUY, total_value="1000")],
+        account,
+        positions,
+        {"BTC": candle},
+    )
+
+    assert positions[0].quantity == Decimal("10")
+    assert positions[0].average_price == Decimal("100")
+    assert account.balances["USD"] == Decimal("0")

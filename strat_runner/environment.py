@@ -67,15 +67,17 @@ class Environment:
             snapshot_path = self.recorder.save_snapshot(step, context)
             orders = self.strategy.decide(context)
 
+            current_candles = {candle.ticker: candle for candle in bar_candles}
             for candle in bar_candles:
                 history[candle.ticker].append(candle)
                 last_candles[candle.ticker] = candle
 
+            # Market orders fill on this bar at close (strategies only saw open + history).
             self.mock_executor.execute(
                 orders,
                 self.account,
                 self.positions,
-                last_candles,
+                current_candles,
             )
 
             last_prices = {
