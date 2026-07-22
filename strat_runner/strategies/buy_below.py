@@ -20,13 +20,8 @@ class BuyBelowStrategy:
         if usd < MIN_USD:
             return []
 
-        candles = context.candles.get(self.ticker, [])
-        if not candles:
-            return []
-
-        current_candle = candles[-1]
-        price = current_candle.close
-        if price <= 0 or price >= self.target_price:
+        price = context.current_open_prices.get(self.ticker)
+        if price is None or price <= 0 or price >= self.target_price:
             return []
 
         quantity = usd / price

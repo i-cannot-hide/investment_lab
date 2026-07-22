@@ -60,13 +60,16 @@ class Environment:
         last_candles: dict[str, Candle] = {}
 
         for step, (time, bar_candles) in enumerate(bars_by_time.items()):
+            current_open_prices = {
+                candle.ticker: candle.open for candle in bar_candles
+            }
+            context = self._build_context(time, history, current_open_prices)
+            snapshot_path = self.recorder.save_snapshot(step, context)
+            orders = self.strategy.decide(context)
+
             for candle in bar_candles:
                 history[candle.ticker].append(candle)
                 last_candles[candle.ticker] = candle
-
-            context = self._build_context(time, history)
-            snapshot_path = self.recorder.save_snapshot(step, context)
-            orders = self.strategy.decide(context)
 
             self.mock_executor.execute(
                 orders,
@@ -100,11 +103,15 @@ class Environment:
         )
 
     def _build_context(
-        self, time: datetime, history: dict[str, list[Candle]]
+        self,
+        time: datetime,
+        history: dict[str, list[Candle]],
+        current_open_prices: dict[str, Decimal],
     ) -> Context:
         return Context(
             time=time,
-            candles=history,
+            history=history,
+            current_open_prices=current_open_prices,
             account=self.account,
             positions=self.positions,
         )

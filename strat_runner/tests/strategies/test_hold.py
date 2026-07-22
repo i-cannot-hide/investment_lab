@@ -21,23 +21,28 @@ def make_candle(ticker: str, close: str, time: datetime | None = None) -> Candle
 def make_context(
     *,
     usd="10000",
-    close="25000",
-    candles: dict[str, list[Candle]] | bool = True,
+    open_price="25000",
+    history: dict[str, list[Candle]] | bool = True,
+    open_prices: dict[str, Decimal] | None = None,
 ):
-    if candles is True:
-        candle_map = {"BTC": [make_candle("BTC", close)]}
-    elif candles is False:
-        candle_map = {}
+    if open_prices is not None:
+        price_map = open_prices
+    elif history is False:
+        price_map = {}
     else:
-        candle_map = candles
+        price_map = {"BTC": Decimal(str(open_price))}
 
-    time = next(
-        (candle.time for series in candle_map.values() for candle in series),
-        datetime(2021, 1, 1),
-    )
+    if history is True:
+        history_map: dict[str, list[Candle]] = {}
+    elif history is False:
+        history_map = {}
+    else:
+        history_map = history
+
     return Context(
-        time=time,
-        candles=candle_map,
+        time=datetime(2021, 1, 1),
+        history=history_map,
+        current_open_prices=price_map,
         account=Account(balances={"USD": Decimal(usd)}),
         positions=[],
     )
@@ -45,7 +50,7 @@ def make_context(
 
 def test_buys_all_available_usd_as_total_value():
     strategy = HoldStrategy()
-    orders = strategy.decide(make_context(usd="10000", close="25000"))
+    orders = strategy.decide(make_context(usd="10000", open_price="25000"))
 
     assert len(orders) == 1
     order = orders[0]
@@ -65,24 +70,22 @@ def test_skips_when_usd_below_minimum():
 
 def test_buys_when_usd_equals_minimum():
     strategy = HoldStrategy()
-    orders = strategy.decide(make_context(usd=str(MIN_USD), close="100"))
+    orders = strategy.decide(make_context(usd=str(MIN_USD), open_price="100"))
 
     assert len(orders) == 1
     assert orders[0].total_value == MIN_USD
     assert orders[0].quantity is None
 
 
-def test_skips_when_no_candles():
+def test_skips_when_no_open_price():
     strategy = HoldStrategy()
 
-    assert strategy.decide(make_context(candles=False)) == []
+    assert strategy.decide(make_context(history=False)) == []
 
 
-def test_skips_when_no_btc_candles():
+def test_skips_when_open_price_missing_for_ticker():
     strategy = HoldStrategy()
-    context = make_context(
-        candles={"ETH": [make_candle("ETH", "2000")]},
-    )
+    context = make_context(open_prices={"ETH": Decimal("2000")})
 
     assert strategy.decide(context) == []
 
@@ -91,10 +94,7 @@ def test_buys_configured_ticker():
     strategy = HoldStrategy(ticker="ETH")
     context = make_context(
         usd="1000",
-        candles={
-            "BTC": [make_candle("BTC", "25000")],
-            "ETH": [make_candle("ETH", "2000")],
-        },
+        open_prices={"BTC": Decimal("25000"), "ETH": Decimal("2000")},
     )
 
     orders = strategy.decide(context)
@@ -108,28 +108,21 @@ def test_buys_configured_ticker():
 def test_skips_when_price_is_zero():
     strategy = HoldStrategy()
 
-    assert strategy.decide(make_context(close="0")) == []
+    assert strategy.decide(make_context(open_price="0")) == []
 
 
 def test_skips_when_price_is_negative():
     strategy = HoldStrategy()
 
-    assert strategy.decide(make_context(close="-1")) == []
+    assert strategy.decide(make_context(open_price="-1")) == []
 
 
-def test_uses_latest_candle_for_price_check():
+def test_does_not_need_history_to_buy():
     strategy = HoldStrategy()
     context = make_context(
         usd="1000",
-        candles={
-            "BTC": [
-                make_candle("BTC", "100", datetime(2021, 1, 1)),
-                make_candle("BTC", "200", datetime(2021, 1, 2)),
-            ],
-            "ETH": [
-                make_candle("ETH", "3000", datetime(2021, 1, 2)),
-            ],
-        },
+        open_price="200",
+        history={},
     )
 
     orders = strategy.decide(context)
@@ -142,10 +135,7 @@ def test_ignores_other_assets_when_buying_btc():
     strategy = HoldStrategy()
     context = make_context(
         usd="10000",
-        candles={
-            "BTC": [make_candle("BTC", "25000")],
-            "ETH": [make_candle("ETH", "1")],
-        },
+        open_prices={"BTC": Decimal("25000"), "ETH": Decimal("1")},
     )
 
     orders = strategy.decide(context)

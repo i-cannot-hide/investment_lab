@@ -62,6 +62,7 @@ class Account:
 @dataclass
 class Context:
     time: datetime
-    candles: dict[str, list[Candle]]
+    history: dict[str, list[Candle]]
+    current_open_prices: dict[str, Decimal]
     account: Account
     positions: list[Position]
