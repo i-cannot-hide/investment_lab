@@ -106,10 +106,15 @@ Research(
         Experiment(strategy=HoldStrategy(ticker="BTC"), name="hold"),
         Experiment(strategy=BuyBelowStrategy(target_price=20000, ticker="BTC"), name="buybelow"),
     ],
-).run(data_files)
+).run(
+    data_files,
+    start_date="2023-01-01",
+    end_date="2024-12-31",
+    initial_usd=10_000,
+)
 ```
 
-`latest_research_entries(outcomes_dir, "hold-vs-buybelow")` returns every outcome from the most recent run of that research.
+`initial_usd` is shared across the batch (same idea as the date window). `latest_research_entries(outcomes_dir, "hold-vs-buybelow")` returns every outcome from the most recent run of that research.
 
 ## Roadmap
 

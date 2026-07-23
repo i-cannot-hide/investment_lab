@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime
+from decimal import Decimal
 from pathlib import Path
 
 from executors.mock_executor import MockExecutor
@@ -26,6 +27,7 @@ class Research:
         start_date: str | datetime | None = None,
         end_date: str | datetime | None = None,
         outcomes_dir: Path | str | None = None,
+        initial_usd: Decimal | int | str | float = 10_000,
     ) -> str:
         """Run every experiment and tag outcomes with this research.
 
@@ -49,6 +51,7 @@ class Research:
                 outcomes_dir=outcomes_dir,
                 research_name=self.name,
                 research_id=self.research_id,
+                initial_usd=initial_usd,
             ).run()
             label = experiment.name or type(experiment.strategy).__name__
             print(f"Finished {self.name} / {label}")

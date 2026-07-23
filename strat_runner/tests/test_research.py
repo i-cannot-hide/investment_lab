@@ -99,3 +99,23 @@ def test_research_requires_experiments():
     research = Research(name="empty", experiments=[])
     with pytest.raises(ValueError, match="at least one"):
         research.run(["unused.csv"])
+
+
+def test_research_run_passes_initial_usd(tmp_path: Path):
+    csv_path = tmp_path / "btc.csv"
+    write_btc_csv(
+        csv_path,
+        [("2023-01-01", "100", "110", "90", "105")],
+    )
+    outcomes_dir = tmp_path / "outcomes"
+    research = Research(
+        name="demo",
+        experiments=[Experiment(strategy=NoOpStrategy(), name="cash")],
+    )
+
+    research.run([str(csv_path)], outcomes_dir=outcomes_dir, initial_usd=2500)
+
+    entries = load_registry(outcomes_dir)
+    assert entries[0]["initial_usd"] == "2500"
+    steps = (outcomes_dir / entries[0]["folder"] / "steps.jsonl").read_text()
+    assert '"balances": {"USD": "2500"}' in steps.splitlines()[0]

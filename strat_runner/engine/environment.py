@@ -35,6 +35,7 @@ class Environment:
         outcomes_dir: Path | str | None = None,
         research_name: str | None = None,
         research_id: str | None = None,
+        initial_usd: Decimal | int | str | float = 10_000,
     ):
         self.experiment = experiment
         self.strategy = experiment.strategy
@@ -46,6 +47,7 @@ class Environment:
         self.end_date = end_date
         self.research_name = research_name
         self.research_id = research_id
+        self.initial_usd = Decimal(str(initial_usd))
 
         project_dir = Path(__file__).resolve().parent.parent
         if isinstance(data_files, str):
@@ -54,7 +56,7 @@ class Environment:
             path if Path(path).is_absolute() else project_dir / path
             for path in data_files
         ]
-        self.account = Account(balances={"USD": Decimal("10000")})
+        self.account = Account(balances={"USD": self.initial_usd})
         self.positions = []
         self.open_orders: list[Order] = []
 
@@ -156,6 +158,7 @@ class Environment:
                 "start_date": times[0].strftime("%Y-%m-%d"),
                 "end_date": times[-1].strftime("%Y-%m-%d"),
                 "interval": self.interval,
+                "initial_usd": str(self.initial_usd),
             },
         )
 
