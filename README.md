@@ -2,13 +2,13 @@
 
 **Simulate. Analyze. Invest.**
 
-A Python lab for simulating investment strategies on historical market data, inspecting runs, and comparing results.
+A Python lab for simulating investment strategies on historical market data, inspecting outcomes, and comparing results.
 
 ## What it does
 
 - Run strategies bar-by-bar against OHLC candles (market and limit orders)
 - Track cash, positions, open orders, and mark-to-market equity
-- Save each run under `strat_runner/runs/` with a searchable registry
+- Save each outcome under `strat_runner/outcomes/` with a searchable registry
 - Explore equity and prices in an interactive Plotly notebook
 
 ## Setup
@@ -30,7 +30,7 @@ cd strat_runner
 python main.py
 ```
 
-Runs are written to `strat_runner/runs/` and indexed in `runs/registry.jsonl`.
+Outcomes are written to `strat_runner/outcomes/` and indexed in `outcomes/registry.jsonl`.
 
 ## Explore results
 
@@ -39,7 +39,7 @@ cd strat_runner/analysis
 jupyter lab explore.ipynb
 ```
 
-Use `load_run(...)` filters (`strategy`, `assets`, `params`, `start_date`, `end_date`, `id`, `folder`) to load the latest matching run, then plot with `plot_series`.
+Use `load_outcome(...)` filters (`strategy`, `assets`, `params`, `start_date`, `end_date`, `id`, `folder`) to load the latest matching outcome, then plot with `plot_series`.
 
 ## Tests
 
@@ -54,14 +54,13 @@ pytest -q
 ```
 strat_runner/
   main.py              # sample simulation entrypoint
-  environment.py       # bar loop: decide → cancel → fill → record
   models.py            # Candle, Order, Decision, Context, …
-  money_spawner.py     # recurring account deposits
+  engine/              # Environment, Experiment, spawners, registry, recorder
   strategies/          # Hold, BuyBelow, …
   executors/           # MockExecutor fill logic
   data/                # loaders, downloaders, preprocessed CSVs
   analysis/            # explore.ipynb + plotter
-  runs/                # simulation outputs + registry
+  outcomes/            # simulation outputs + registry
   tests/
 ```
 
@@ -74,17 +73,25 @@ Strategies implement `decide(context) -> Decision | None`:
 
 `Context` exposes history (past bars only), current open prices, account, positions, and open orders. Return `Decision(orders=..., cancel_order_ids=...)` or `None` for a no-op.
 
-## Money Spawner
+## Experiments
 
-Optional recurring deposits credited **before** each `decide()`:
+Pass an `Experiment` into `Environment` instead of a bare strategy:
 
 ```python
-from money_spawner import MoneySpawner, SpawnInterval
+from engine import Experiment, MoneySpawner, SpawnInterval
 
-MoneySpawner(currency="USD", amount=1000, interval=SpawnInterval.MONTH)
+Experiment(
+    strategy=BuyBelowStrategy(target_price=20000, ticker="BTC"),
+    money_spawner=MoneySpawner(
+        currency="USD",
+        amount=1000,
+        interval=SpawnInterval.MONTH,
+    ),
+    name="buybelow+spawn",
+)
 ```
 
-Intervals: `SpawnInterval.DAY`, `.WEEK`, `.MONTH` (first bar of each period). Pass via `Environment(..., money_spawner=...)`. Deposits are logged on each step as `deposit`.
+The registry stores `name`, strategy metadata, and `money_spawner` config. Deposits are logged on each step as `deposit`.
 
 ## Roadmap
 

@@ -4,11 +4,15 @@ from pathlib import Path
 
 import pytest
 
-from environment import Environment
+from engine import (
+    Environment,
+    Experiment,
+    MoneySpawner,
+    SpawnInterval,
+    load_registry,
+)
 from executors.mock_executor import MockExecutor
 from models import Account, Context, Decision, Order, OrderSide, OrderType
-from money_spawner import MoneySpawner, SpawnInterval
-from outcome_registry import load_registry
 from strategies.hold import HoldStrategy
 
 
@@ -109,7 +113,7 @@ def test_history_excludes_current_candle_and_exposes_open(
 ):
     recorder = RecordingStrategy(HoldStrategy(ticker="BTC"))
     environment = Environment(
-        recorder,
+        Experiment(recorder),
         MockExecutor(),
         [str(btc_csv)],
         outcomes_dir=tmp_path / "outcomes",
@@ -142,7 +146,7 @@ def test_history_excludes_current_candle_and_exposes_open(
 
 def test_market_order_fills_at_close_not_open(tmp_path: Path, btc_csv: Path):
     environment = Environment(
-        HoldStrategy(ticker="BTC"),
+        Experiment(HoldStrategy(ticker="BTC")),
         MockExecutor(),
         [str(btc_csv)],
         outcomes_dir=tmp_path / "outcomes",
@@ -161,7 +165,7 @@ def test_market_order_fills_at_close_not_open(tmp_path: Path, btc_csv: Path):
 def test_date_range_filters_bars(tmp_path: Path, btc_csv: Path):
     recorder = RecordingStrategy(HoldStrategy(ticker="BTC"))
     environment = Environment(
-        recorder,
+        Experiment(recorder),
         MockExecutor(),
         [str(btc_csv)],
         outcomes_dir=tmp_path / "outcomes",
@@ -182,7 +186,7 @@ def test_date_range_filters_bars(tmp_path: Path, btc_csv: Path):
 
 def test_run_writes_steps_and_registry(tmp_path: Path, btc_csv: Path):
     environment = Environment(
-        HoldStrategy(ticker="BTC"),
+        Experiment(HoldStrategy(ticker="BTC")),
         MockExecutor(),
         [str(btc_csv)],
         outcomes_dir=tmp_path / "outcomes",
@@ -207,7 +211,7 @@ def test_run_writes_steps_and_registry(tmp_path: Path, btc_csv: Path):
 
 def test_empty_date_range_raises(tmp_path: Path, btc_csv: Path):
     environment = Environment(
-        HoldStrategy(ticker="BTC"),
+        Experiment(HoldStrategy(ticker="BTC")),
         MockExecutor(),
         [str(btc_csv)],
         outcomes_dir=tmp_path / "outcomes",
@@ -231,7 +235,7 @@ def test_limit_order_rests_then_fills_when_touched(tmp_path: Path):
     )
     recorder = RecordingStrategy(LimitBuyStrategy(price="90"))
     environment = Environment(
-        recorder,
+        Experiment(recorder),
         MockExecutor(),
         [str(csv_path)],
         outcomes_dir=tmp_path / "outcomes",
@@ -262,7 +266,7 @@ def test_strategy_can_cancel_open_orders(tmp_path: Path):
     )
     recorder = RecordingStrategy(LimitThenCancelStrategy())
     environment = Environment(
-        recorder,
+        Experiment(recorder),
         MockExecutor(),
         [str(csv_path)],
         outcomes_dir=tmp_path / "outcomes",
@@ -296,7 +300,7 @@ def test_new_limit_waits_until_next_bar_to_fill(tmp_path: Path):
     )
     recorder = RecordingStrategy(LimitBuyStrategy(price="90"))
     environment = Environment(
-        recorder,
+        Experiment(recorder),
         MockExecutor(),
         [str(csv_path)],
         outcomes_dir=tmp_path / "outcomes",
@@ -326,15 +330,17 @@ def test_money_spawner_credits_before_decide(tmp_path: Path):
     )
     recorder = RecordingStrategy(NoOpStrategy())
     environment = Environment(
-        recorder,
+        Experiment(
+            recorder,
+            money_spawner=MoneySpawner(
+                currency="USD",
+                amount=1000,
+                interval=SpawnInterval.MONTH,
+            ),
+        ),
         MockExecutor(),
         [str(csv_path)],
         outcomes_dir=tmp_path / "outcomes",
-        money_spawner=MoneySpawner(
-            currency="USD",
-            amount=1000,
-            interval=SpawnInterval.MONTH,
-        ),
     )
     environment.run()
 

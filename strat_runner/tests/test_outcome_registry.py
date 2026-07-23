@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from outcome_registry import find_entries, latest_entry, steps_path
+from engine import find_entries, latest_entry, steps_path
 
 
 def write_registry(outcomes_dir: Path, entries: list[dict]) -> None:

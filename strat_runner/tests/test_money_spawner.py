@@ -4,7 +4,7 @@ from decimal import Decimal
 import pytest
 
 from models import Account
-from money_spawner import MoneySpawner, SpawnInterval
+from engine import MoneySpawner, SpawnInterval
 
 
 def test_rejects_non_positive_amount():

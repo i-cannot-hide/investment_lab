@@ -12,9 +12,9 @@ from models import (
     Order,
     OrderType,
 )
-from money_spawner import MoneySpawner
-from recorder import Recorder
-from outcome_registry import (
+from engine.experiment import Experiment
+from engine.recorder import Recorder
+from engine.outcome_registry import (
     allocate_outcome_dir,
     register_outcome,
     strategy_assets,
@@ -25,7 +25,7 @@ from outcome_registry import (
 class Environment:
     def __init__(
         self,
-        strategy,
+        experiment: Experiment,
         mock_executor,
         data_files: str | list[str],
         full_debug_outcomes: bool = False,
@@ -33,17 +33,17 @@ class Environment:
         start_date: str | datetime | None = None,
         end_date: str | datetime | None = None,
         outcomes_dir: Path | str | None = None,
-        money_spawner: MoneySpawner | None = None,
     ):
-        self.strategy = strategy
+        self.experiment = experiment
+        self.strategy = experiment.strategy
+        self.money_spawner = experiment.money_spawner
         self.mock_executor = mock_executor
         self.full_debug_outcomes = full_debug_outcomes
         self.interval = interval
         self.start_date = start_date
         self.end_date = end_date
-        self.money_spawner = money_spawner
 
-        project_dir = Path(__file__).parent
+        project_dir = Path(__file__).resolve().parent.parent
         if isinstance(data_files, str):
             data_files = [data_files]
         self.data_files = [
@@ -134,9 +134,19 @@ class Environment:
                 "id": self.outcome_id,
                 "folder": self.recorder.folder.name,
                 "date_time": self.date_time,
+                "name": self.experiment.name,
                 "strategy": type(self.strategy).__name__.removesuffix("Strategy").lower(),
                 "assets": strategy_assets(self.strategy),
                 "params": strategy_params(self.strategy),
+                "money_spawner": (
+                    None
+                    if self.money_spawner is None
+                    else {
+                        "currency": self.money_spawner.currency,
+                        "amount": str(self.money_spawner.amount),
+                        "interval": self.money_spawner.interval.value,
+                    }
+                ),
                 "start_date": times[0].strftime("%Y-%m-%d"),
                 "end_date": times[-1].strftime("%Y-%m-%d"),
                 "interval": self.interval,
