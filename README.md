@@ -2,13 +2,13 @@
 
 **Simulate. Analyze. Invest.**
 
-A Python lab for simulating investment strategies on historical market data, inspecting runs, and comparing results.
+A Python lab for simulating investment strategies on historical market data, inspecting outcomes, and comparing results.
 
 ## What it does
 
 - Run strategies bar-by-bar against OHLC candles (market and limit orders)
 - Track cash, positions, open orders, and mark-to-market equity
-- Save each run under `strat_runner/runs/` with a searchable registry
+- Save each outcome under `strat_runner/outcomes/` with a searchable registry
 - Explore equity and prices in an interactive Plotly notebook
 
 ## Setup
@@ -30,7 +30,7 @@ cd strat_runner
 python main.py
 ```
 
-Runs are written to `strat_runner/runs/` and indexed in `runs/registry.jsonl`.
+Outcomes are written to `strat_runner/outcomes/` and indexed in `outcomes/registry.jsonl`.
 
 ## Explore results
 
@@ -39,7 +39,7 @@ cd strat_runner/analysis
 jupyter lab explore.ipynb
 ```
 
-Use `load_run(...)` filters (`strategy`, `assets`, `params`, `start_date`, `end_date`, `id`, `folder`) to load the latest matching run, then plot with `plot_series`.
+Use `load_outcome(...)` filters (`strategy`, `assets`, `params`, `start_date`, `end_date`, `id`, `folder`) to load the latest matching outcome, then plot with `plot_series`.
 
 ## Tests
 
@@ -57,11 +57,12 @@ strat_runner/
   environment.py       # bar loop: decide → cancel → fill → record
   models.py            # Candle, Order, Decision, Context, …
   money_spawner.py     # recurring account deposits
+  outcome_registry.py  # outcome catalog helpers
   strategies/          # Hold, BuyBelow, …
   executors/           # MockExecutor fill logic
   data/                # loaders, downloaders, preprocessed CSVs
   analysis/            # explore.ipynb + plotter
-  runs/                # simulation outputs + registry
+  outcomes/            # simulation outputs + registry
   tests/
 ```
 

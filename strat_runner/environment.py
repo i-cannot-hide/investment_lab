@@ -14,9 +14,9 @@ from models import (
 )
 from money_spawner import MoneySpawner
 from recorder import Recorder
-from run_registry import (
-    allocate_run_dir,
-    register_run,
+from outcome_registry import (
+    allocate_outcome_dir,
+    register_outcome,
     strategy_assets,
     strategy_params,
 )
@@ -28,16 +28,16 @@ class Environment:
         strategy,
         mock_executor,
         data_files: str | list[str],
-        full_debug_runs: bool = False,
+        full_debug_outcomes: bool = False,
         interval: str = "1d",
         start_date: str | datetime | None = None,
         end_date: str | datetime | None = None,
-        runs_dir: Path | str | None = None,
+        outcomes_dir: Path | str | None = None,
         money_spawner: MoneySpawner | None = None,
     ):
         self.strategy = strategy
         self.mock_executor = mock_executor
-        self.full_debug_runs = full_debug_runs
+        self.full_debug_outcomes = full_debug_outcomes
         self.interval = interval
         self.start_date = start_date
         self.end_date = end_date
@@ -54,9 +54,9 @@ class Environment:
         self.positions = []
         self.open_orders: list[Order] = []
 
-        self.runs_dir = Path(runs_dir) if runs_dir is not None else project_dir / "runs"
-        self.run_id, self.date_time, run_folder = allocate_run_dir(self.runs_dir)
-        self.recorder = Recorder(run_folder, full_debug_runs=full_debug_runs)
+        self.outcomes_dir = Path(outcomes_dir) if outcomes_dir is not None else project_dir / "outcomes"
+        self.outcome_id, self.date_time, outcome_folder = allocate_outcome_dir(self.outcomes_dir)
+        self.recorder = Recorder(outcome_folder, full_debug_outcomes=full_debug_outcomes)
 
     def run(self):
         candles = load_candles_many(self.data_files)
@@ -128,10 +128,10 @@ class Environment:
             )
 
         times = list(bars_by_time)
-        register_run(
-            self.runs_dir,
+        register_outcome(
+            self.outcomes_dir,
             {
-                "id": self.run_id,
+                "id": self.outcome_id,
                 "folder": self.recorder.folder.name,
                 "date_time": self.date_time,
                 "strategy": type(self.strategy).__name__.removesuffix("Strategy").lower(),

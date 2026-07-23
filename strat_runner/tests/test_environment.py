@@ -8,7 +8,7 @@ from environment import Environment
 from executors.mock_executor import MockExecutor
 from models import Account, Context, Decision, Order, OrderSide, OrderType
 from money_spawner import MoneySpawner, SpawnInterval
-from run_registry import load_registry
+from outcome_registry import load_registry
 from strategies.hold import HoldStrategy
 
 
@@ -112,7 +112,7 @@ def test_history_excludes_current_candle_and_exposes_open(
         recorder,
         MockExecutor(),
         [str(btc_csv)],
-        runs_dir=tmp_path / "runs",
+        outcomes_dir=tmp_path / "outcomes",
     )
     environment.run()
 
@@ -145,7 +145,7 @@ def test_market_order_fills_at_close_not_open(tmp_path: Path, btc_csv: Path):
         HoldStrategy(ticker="BTC"),
         MockExecutor(),
         [str(btc_csv)],
-        runs_dir=tmp_path / "runs",
+        outcomes_dir=tmp_path / "outcomes",
     )
     environment.run()
 
@@ -164,7 +164,7 @@ def test_date_range_filters_bars(tmp_path: Path, btc_csv: Path):
         recorder,
         MockExecutor(),
         [str(btc_csv)],
-        runs_dir=tmp_path / "runs",
+        outcomes_dir=tmp_path / "outcomes",
         start_date="2021-01-02",
         end_date="2021-01-02",
     )
@@ -174,7 +174,7 @@ def test_date_range_filters_bars(tmp_path: Path, btc_csv: Path):
     assert recorder.contexts[0].current_open_prices["BTC"] == Decimal("110")
     assert recorder.contexts[0].history.get("BTC", []) == []
 
-    entries = load_registry(tmp_path / "runs")
+    entries = load_registry(tmp_path / "outcomes")
     assert len(entries) == 1
     assert entries[0]["start_date"] == "2021-01-02"
     assert entries[0]["end_date"] == "2021-01-02"
@@ -185,11 +185,11 @@ def test_run_writes_steps_and_registry(tmp_path: Path, btc_csv: Path):
         HoldStrategy(ticker="BTC"),
         MockExecutor(),
         [str(btc_csv)],
-        runs_dir=tmp_path / "runs",
+        outcomes_dir=tmp_path / "outcomes",
     )
     environment.run()
 
-    entries = load_registry(tmp_path / "runs")
+    entries = load_registry(tmp_path / "outcomes")
     assert len(entries) == 1
     entry = entries[0]
     assert entry["strategy"] == "hold"
@@ -197,7 +197,7 @@ def test_run_writes_steps_and_registry(tmp_path: Path, btc_csv: Path):
     assert entry["start_date"] == "2021-01-01"
     assert entry["end_date"] == "2021-01-03"
 
-    steps_file = tmp_path / "runs" / entry["folder"] / "steps.jsonl"
+    steps_file = tmp_path / "outcomes" / entry["folder"] / "steps.jsonl"
     steps = [json.loads(line) for line in steps_file.read_text().splitlines()]
     assert len(steps) == 3
     assert steps[0]["decision"][0]["total_value"] == "10000"
@@ -210,7 +210,7 @@ def test_empty_date_range_raises(tmp_path: Path, btc_csv: Path):
         HoldStrategy(ticker="BTC"),
         MockExecutor(),
         [str(btc_csv)],
-        runs_dir=tmp_path / "runs",
+        outcomes_dir=tmp_path / "outcomes",
         start_date="2030-01-01",
         end_date="2030-01-02",
     )
@@ -234,7 +234,7 @@ def test_limit_order_rests_then_fills_when_touched(tmp_path: Path):
         recorder,
         MockExecutor(),
         [str(csv_path)],
-        runs_dir=tmp_path / "runs",
+        outcomes_dir=tmp_path / "outcomes",
     )
     environment.run()
 
@@ -265,7 +265,7 @@ def test_strategy_can_cancel_open_orders(tmp_path: Path):
         recorder,
         MockExecutor(),
         [str(csv_path)],
-        runs_dir=tmp_path / "runs",
+        outcomes_dir=tmp_path / "outcomes",
     )
     environment.run()
 
@@ -275,8 +275,8 @@ def test_strategy_can_cancel_open_orders(tmp_path: Path):
     assert environment.positions == []
     assert environment.account.balances["USD"] == Decimal("10000")
 
-    entries = load_registry(tmp_path / "runs")
-    steps_file = tmp_path / "runs" / entries[0]["folder"] / "steps.jsonl"
+    entries = load_registry(tmp_path / "outcomes")
+    steps_file = tmp_path / "outcomes" / entries[0]["folder"] / "steps.jsonl"
     steps = [json.loads(line) for line in steps_file.read_text().splitlines()]
     assert steps[0]["open_orders"][0]["price"] == "50"
     assert steps[1]["cancel_order_ids"] == [steps[0]["open_orders"][0]["id"]]
@@ -299,7 +299,7 @@ def test_new_limit_waits_until_next_bar_to_fill(tmp_path: Path):
         recorder,
         MockExecutor(),
         [str(csv_path)],
-        runs_dir=tmp_path / "runs",
+        outcomes_dir=tmp_path / "outcomes",
     )
     environment.run()
 
@@ -329,7 +329,7 @@ def test_money_spawner_credits_before_decide(tmp_path: Path):
         recorder,
         MockExecutor(),
         [str(csv_path)],
-        runs_dir=tmp_path / "runs",
+        outcomes_dir=tmp_path / "outcomes",
         money_spawner=MoneySpawner(
             currency="USD",
             amount=1000,
@@ -343,8 +343,8 @@ def test_money_spawner_credits_before_decide(tmp_path: Path):
     assert recorder.contexts[1].account.balances["USD"] == Decimal("11000")
     assert recorder.contexts[2].account.balances["USD"] == Decimal("12000")
 
-    entries = load_registry(tmp_path / "runs")
-    steps_file = tmp_path / "runs" / entries[0]["folder"] / "steps.jsonl"
+    entries = load_registry(tmp_path / "outcomes")
+    steps_file = tmp_path / "outcomes" / entries[0]["folder"] / "steps.jsonl"
     steps = [json.loads(line) for line in steps_file.read_text().splitlines()]
     assert steps[0]["deposit"] == {"currency": "USD", "amount": "1000"}
     assert steps[1]["deposit"] is None

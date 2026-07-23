@@ -23,7 +23,7 @@ for strategy in strategies:
         strategy,
         MockExecutor(),
         data_files,
-        full_debug_runs=False,
+        full_debug_outcomes=False,
         start_date="2023-01-01",
         end_date="2024-12-31",
         money_spawner=MoneySpawner(

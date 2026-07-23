@@ -6,9 +6,9 @@ from shutil import rmtree
 
 class Recorder:
 
-    def __init__(self, folder: str, full_debug_runs: bool = False):
+    def __init__(self, folder: str, full_debug_outcomes: bool = False):
         self.folder = Path(folder)
-        self.full_debug_runs = full_debug_runs
+        self.full_debug_outcomes = full_debug_outcomes
 
         if self.folder.exists():
             rmtree(self.folder)
@@ -17,11 +17,11 @@ class Recorder:
         self.steps_file = self.folder / "steps.jsonl"
         self.snapshots_folder = self.folder / "snapshots"
 
-        if self.full_debug_runs:
+        if self.full_debug_outcomes:
             self.snapshots_folder.mkdir(parents=True)
 
     def save_snapshot(self, step: int, context):
-        if not self.full_debug_runs:
+        if not self.full_debug_outcomes:
             return None
 
         path = self.snapshots_folder / f"{step:06d}.json"
