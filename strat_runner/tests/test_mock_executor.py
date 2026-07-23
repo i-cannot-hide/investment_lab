@@ -344,3 +344,51 @@ def test_limit_sell_fills_when_high_touches():
 
     assert positions == []
     assert account.balances["USD"] == Decimal("120")
+
+
+def test_limit_buy_fills_at_open_when_gap_through_limit():
+    account = Account(balances={"USD": Decimal("20000")})
+    positions: list[Position] = []
+    executor = MockExecutor()
+    order = Order(
+        ticker="BTC",
+        side=OrderSide.BUY,
+        order_type=OrderType.LIMIT,
+        quantity=Decimal("1"),
+        price=Decimal("20000"),
+    )
+
+    executor.execute(
+        [order],
+        account,
+        positions,
+        {"BTC": make_ohlc_candle(open_="15000", high="16000", low="14000", close="15500")},
+    )
+
+    assert positions[0].average_price == Decimal("15000")
+    assert account.balances["USD"] == Decimal("5000")
+
+
+def test_limit_sell_fills_at_open_when_gap_through_limit():
+    account = Account(balances={"USD": Decimal("0")})
+    positions = [
+        Position(ticker="BTC", quantity=Decimal("1"), average_price=Decimal("100"))
+    ]
+    executor = MockExecutor()
+    order = Order(
+        ticker="BTC",
+        side=OrderSide.SELL,
+        order_type=OrderType.LIMIT,
+        quantity=Decimal("1"),
+        price=Decimal("120"),
+    )
+
+    executor.execute(
+        [order],
+        account,
+        positions,
+        {"BTC": make_ohlc_candle(open_="150", high="160", low="145", close="155")},
+    )
+
+    assert positions == []
+    assert account.balances["USD"] == Decimal("150")

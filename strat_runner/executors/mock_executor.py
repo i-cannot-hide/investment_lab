@@ -19,7 +19,7 @@ class MockExecutor:
             elif order.order_type == OrderType.LIMIT:
                 if not self.limit_is_triggered(order, candle):
                     continue
-                price = order.price
+                price = self.limit_fill_price(order, candle)
             else:
                 raise ValueError(f"Unsupported order type: {order.order_type}")
 
@@ -36,6 +36,18 @@ class MockExecutor:
         if order.side == OrderSide.SELL:
             return candle.high >= order.price
         return False
+
+    def limit_fill_price(self, order: Order, candle: Candle) -> Decimal:
+        """Fill at limit, or at open if the bar gaps through the limit."""
+        if order.side == OrderSide.BUY:
+            if candle.open <= order.price:
+                return candle.open
+            return order.price
+        if order.side == OrderSide.SELL:
+            if candle.open >= order.price:
+                return candle.open
+            return order.price
+        raise ValueError(f"Unsupported order side: {order.side}")
 
     def _resolve_quantity(self, order: Order, price: Decimal) -> Decimal:
         if order.total_value is not None:
