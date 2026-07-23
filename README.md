@@ -56,6 +56,7 @@ strat_runner/
   main.py              # sample simulation entrypoint
   environment.py       # bar loop: decide → cancel → fill → record
   models.py            # Candle, Order, Decision, Context, …
+  money_spawner.py     # recurring account deposits
   strategies/          # Hold, BuyBelow, …
   executors/           # MockExecutor fill logic
   data/                # loaders, downloaders, preprocessed CSVs
@@ -73,9 +74,20 @@ Strategies implement `decide(context) -> Decision | None`:
 
 `Context` exposes history (past bars only), current open prices, account, positions, and open orders. Return `Decision(orders=..., cancel_order_ids=...)` or `None` for a no-op.
 
+## Money Spawner
+
+Optional recurring deposits credited **before** each `decide()`:
+
+```python
+from money_spawner import MoneySpawner, SpawnInterval
+
+MoneySpawner(currency="USD", amount=1000, interval=SpawnInterval.MONTH)
+```
+
+Intervals: `SpawnInterval.DAY`, `.WEEK`, `.MONTH` (first bar of each period). Pass via `Environment(..., money_spawner=...)`. Deposits are logged on each step as `deposit`.
+
 ## Roadmap
 
-- Money Spawner
 - Money Burner
 - Show more charts
 - Show USD and positions separately

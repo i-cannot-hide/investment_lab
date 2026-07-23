@@ -2,6 +2,7 @@ from pathlib import Path
 
 from environment import Environment
 from executors.mock_executor import MockExecutor
+from money_spawner import MoneySpawner, SpawnInterval
 from strategies.hold import HoldStrategy
 from strategies.buy_below import BuyBelowStrategy
 
@@ -25,6 +26,11 @@ for strategy in strategies:
         full_debug_runs=False,
         start_date="2023-01-01",
         end_date="2024-12-31",
+        money_spawner=MoneySpawner(
+            currency="USD",
+            amount=1000,
+            interval=SpawnInterval.MONTH,
+        ),
     )
     environment.run()
     print(f"Finished {type(strategy).__name__}")

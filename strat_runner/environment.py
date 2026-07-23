@@ -12,6 +12,7 @@ from models import (
     Order,
     OrderType,
 )
+from money_spawner import MoneySpawner
 from recorder import Recorder
 from run_registry import (
     allocate_run_dir,
@@ -32,6 +33,7 @@ class Environment:
         start_date: str | datetime | None = None,
         end_date: str | datetime | None = None,
         runs_dir: Path | str | None = None,
+        money_spawner: MoneySpawner | None = None,
     ):
         self.strategy = strategy
         self.mock_executor = mock_executor
@@ -39,6 +41,7 @@ class Environment:
         self.interval = interval
         self.start_date = start_date
         self.end_date = end_date
+        self.money_spawner = money_spawner
 
         project_dir = Path(__file__).parent
         if isinstance(data_files, str):
@@ -77,6 +80,10 @@ class Environment:
             }
             current_candles = {candle.ticker: candle for candle in bar_candles}
 
+            deposit = None
+            if self.money_spawner is not None:
+                deposit = self.money_spawner.spawn(time, self.account)
+
             context = self._build_context(time, history, current_open_prices)
             snapshot_path = self.recorder.save_snapshot(step, context)
             decision = self.strategy.decide(context) or Decision()
@@ -99,7 +106,7 @@ class Environment:
                 last_candles[candle.ticker] = candle
 
             filled_ids = self._fill_open_orders(current_candles)
-            
+
             self.open_orders.extend(limits)
 
             last_prices = {
@@ -116,6 +123,7 @@ class Environment:
                     filled_ids,
                     equity,
                     snapshot_path,
+                    deposit,
                 )
             )
 
@@ -209,11 +217,20 @@ class Environment:
         filled_ids: list[str],
         equity: Decimal,
         snapshot_path: Path | None,
+        deposit: Decimal | None = None,
     ) -> dict:
         record = {
             "step": step,
             "time": str(time),
             "prices": {ticker: str(price) for ticker, price in prices.items()},
+            "deposit": (
+                None
+                if deposit is None
+                else {
+                    "currency": self.money_spawner.currency,
+                    "amount": str(deposit),
+                }
+            ),
             "decision": [
                 {
                     "id": order.id,

@@ -6,7 +6,8 @@ import pytest
 
 from environment import Environment
 from executors.mock_executor import MockExecutor
-from models import Context, Decision, Order, OrderSide, OrderType
+from models import Account, Context, Decision, Order, OrderSide, OrderType
+from money_spawner import MoneySpawner, SpawnInterval
 from run_registry import load_registry
 from strategies.hold import HoldStrategy
 
@@ -35,7 +36,7 @@ class RecordingStrategy:
                     for ticker, candles in context.history.items()
                 },
                 current_open_prices=dict(context.current_open_prices),
-                account=context.account,
+                account=Account(balances=dict(context.account.balances)),
                 positions=list(context.positions),
                 open_orders=list(context.open_orders),
             )
@@ -306,3 +307,45 @@ def test_new_limit_waits_until_next_bar_to_fill(tmp_path: Path):
     assert environment.open_orders == []
     assert environment.positions[0].average_price == Decimal("90")
     assert environment.account.balances["USD"] == Decimal("9910")
+
+
+class NoOpStrategy:
+    def decide(self, context: Context) -> None:
+        return None
+
+
+def test_money_spawner_credits_before_decide(tmp_path: Path):
+    csv_path = tmp_path / "btc.csv"
+    write_btc_csv(
+        csv_path,
+        [
+            ("2023-01-01", "100", "110", "90", "105"),
+            ("2023-01-15", "105", "110", "100", "108"),
+            ("2023-02-01", "108", "120", "105", "115"),
+        ],
+    )
+    recorder = RecordingStrategy(NoOpStrategy())
+    environment = Environment(
+        recorder,
+        MockExecutor(),
+        [str(csv_path)],
+        runs_dir=tmp_path / "runs",
+        money_spawner=MoneySpawner(
+            currency="USD",
+            amount=1000,
+            interval=SpawnInterval.MONTH,
+        ),
+    )
+    environment.run()
+
+    # Starting 10000 + Jan deposit visible on first decide.
+    assert recorder.contexts[0].account.balances["USD"] == Decimal("11000")
+    assert recorder.contexts[1].account.balances["USD"] == Decimal("11000")
+    assert recorder.contexts[2].account.balances["USD"] == Decimal("12000")
+
+    entries = load_registry(tmp_path / "runs")
+    steps_file = tmp_path / "runs" / entries[0]["folder"] / "steps.jsonl"
+    steps = [json.loads(line) for line in steps_file.read_text().splitlines()]
+    assert steps[0]["deposit"] == {"currency": "USD", "amount": "1000"}
+    assert steps[1]["deposit"] is None
+    assert steps[2]["deposit"] == {"currency": "USD", "amount": "1000"}
