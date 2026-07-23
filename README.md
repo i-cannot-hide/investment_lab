@@ -68,6 +68,7 @@ strat_runner/
 
 Strategies implement `decide(context) -> Decision | None`:
 
+- **`DoNothingStrategy`** — keep USD idle; never places orders
 - **`HoldStrategy`** — market-buy available USD when the ticker is present
 - **`BuyBelowStrategy`** — rest a limit buy at a target price
 
