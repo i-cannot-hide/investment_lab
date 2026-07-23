@@ -72,3 +72,10 @@ Strategies implement `decide(context) -> Decision | None`:
 - **`BuyBelowStrategy`** — rest a limit buy at a target price
 
 `Context` exposes history (past bars only), current open prices, account, positions, and open orders. Return `Decision(orders=..., cancel_order_ids=...)` or `None` for a no-op.
+
+## Roadmap
+
+- Money Spawner
+- Money Burner
+- Show more charts
+- Show USD and positions separately
