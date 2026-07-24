@@ -1,6 +1,14 @@
+from dataclasses import dataclass
 from decimal import Decimal
 
 from models import Account, Candle, Order, OrderSide, Position, OrderType
+
+
+@dataclass(frozen=True)
+class Fill:
+    order: Order
+    quantity: Decimal
+    price: Decimal
 
 
 class MockExecutor:
@@ -10,7 +18,8 @@ class MockExecutor:
         account: Account,
         positions: list[Position],
         candles: dict[str, Candle],
-    ):
+    ) -> list[Fill]:
+        fills: list[Fill] = []
         for order in orders:
             candle = candles[order.ticker]
 
@@ -29,6 +38,9 @@ class MockExecutor:
                 self._buy(order.ticker, quantity, price, account, positions)
             elif order.side == OrderSide.SELL:
                 self._sell(order.ticker, quantity, price, account, positions)
+
+            fills.append(Fill(order=order, quantity=quantity, price=price))
+        return fills
 
     def limit_is_triggered(self, order: Order, candle: Candle) -> bool:
         if order.side == OrderSide.BUY:

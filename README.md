@@ -92,7 +92,7 @@ Experiment(
 )
 ```
 
-The registry stores `name`, strategy metadata, and `money_spawner` config. Deposits are logged on each step as `deposit`.
+The registry stores `name`, strategy metadata, and `money_spawner` config. Applied changes are logged on each step as a `journal` of typed `entries` (deposits, fills, cancellations, …).
 
 ## Research
 
@@ -122,6 +122,6 @@ Research(
 - Money Burner
 - Show more charts
 - Show USD and positions separately
-- Events like trades, spawns or burns should be visible on the chart.
+- Journal markers on charts (fills, deposits, …) — partially done
 - Implement leverage
 - Implement fees

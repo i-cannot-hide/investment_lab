@@ -1,5 +1,6 @@
 from engine.environment import Environment
 from engine.experiment import Experiment
+from engine.journal import EntryType
 from engine.money_spawner import MoneySpawner, SpawnInterval
 from engine.outcome_registry import (
     find_entries,
@@ -14,6 +15,7 @@ from engine.recorder import Recorder
 from engine.research import Research
 
 __all__ = [
+    "EntryType",
     "Environment",
     "Experiment",
     "MoneySpawner",

@@ -206,7 +206,19 @@ def test_run_writes_steps_and_registry(tmp_path: Path, btc_csv: Path):
     assert len(steps) == 3
     assert steps[0]["decision"][0]["total_value"] == "10000"
     assert steps[0]["positions"][0]["average_price"] == "110"
+    assert steps[0]["journal"] == [
+        {
+            "type": "order_filled",
+            "order_id": steps[0]["decision"][0]["id"],
+            "ticker": "BTC",
+            "side": "BUY",
+            "order_type": "MARKET",
+            "quantity": steps[0]["positions"][0]["quantity"],
+            "price": "110",
+        }
+    ]
     assert steps[1]["decision"] == []
+    assert steps[1]["journal"] == []
 
 
 def test_empty_date_range_raises(tmp_path: Path, btc_csv: Path):
@@ -253,6 +265,22 @@ def test_limit_order_rests_then_fills_when_touched(tmp_path: Path):
     assert environment.positions[0].average_price == Decimal("90")
     assert environment.account.balances["USD"] == Decimal("9910")
 
+    entries = load_registry(tmp_path / "outcomes")
+    steps_file = tmp_path / "outcomes" / entries[0]["folder"] / "steps.jsonl"
+    steps = [json.loads(line) for line in steps_file.read_text().splitlines()]
+    assert steps[0]["journal"] == []
+    assert steps[1]["journal"] == [
+        {
+            "type": "order_filled",
+            "order_id": recorder.contexts[1].open_orders[0].id,
+            "ticker": "BTC",
+            "side": "BUY",
+            "order_type": "LIMIT",
+            "quantity": "1",
+            "price": "90",
+        }
+    ]
+
 
 def test_strategy_can_cancel_open_orders(tmp_path: Path):
     csv_path = tmp_path / "btc.csv"
@@ -283,7 +311,19 @@ def test_strategy_can_cancel_open_orders(tmp_path: Path):
     steps_file = tmp_path / "outcomes" / entries[0]["folder"] / "steps.jsonl"
     steps = [json.loads(line) for line in steps_file.read_text().splitlines()]
     assert steps[0]["open_orders"][0]["price"] == "50"
-    assert steps[1]["cancel_order_ids"] == [steps[0]["open_orders"][0]["id"]]
+    order_id = steps[0]["open_orders"][0]["id"]
+    assert steps[1]["journal"] == [
+        {
+            "type": "order_cancelled",
+            "order_id": order_id,
+            "ticker": "BTC",
+            "side": "BUY",
+            "order_type": "LIMIT",
+            "quantity": "1",
+            "total_value": None,
+            "price": "50",
+        }
+    ]
     assert steps[1]["open_orders"] == []
 
 
@@ -352,6 +392,10 @@ def test_money_spawner_credits_before_decide(tmp_path: Path):
     entries = load_registry(tmp_path / "outcomes")
     steps_file = tmp_path / "outcomes" / entries[0]["folder"] / "steps.jsonl"
     steps = [json.loads(line) for line in steps_file.read_text().splitlines()]
-    assert steps[0]["deposit"] == {"currency": "USD", "amount": "1000"}
-    assert steps[1]["deposit"] is None
-    assert steps[2]["deposit"] == {"currency": "USD", "amount": "1000"}
+    assert steps[0]["journal"] == [
+        {"type": "deposit", "currency": "USD", "amount": "1000"}
+    ]
+    assert steps[1]["journal"] == []
+    assert steps[2]["journal"] == [
+        {"type": "deposit", "currency": "USD", "amount": "1000"}
+    ]

@@ -13,6 +13,11 @@ from models import (
     OrderType,
 )
 from engine.experiment import Experiment
+from engine.journal import (
+    deposit_entry,
+    order_cancelled_entry,
+    order_filled_entry,
+)
 from engine.recorder import Recorder
 from engine.outcome_registry import (
     allocate_outcome_dir,
@@ -20,6 +25,7 @@ from engine.outcome_registry import (
     strategy_assets,
     strategy_params,
 )
+from executors.mock_executor import Fill
 
 
 class Environment:
@@ -85,16 +91,26 @@ class Environment:
                 candle.ticker: candle.open for candle in bar_candles
             }
             current_candles = {candle.ticker: candle for candle in bar_candles}
+            journal: list[dict] = []
 
-            deposit = None
             if self.money_spawner is not None:
                 deposit = self.money_spawner.spawn(time, self.account)
+                if deposit is not None:
+                    journal.append(
+                        deposit_entry(
+                            currency=self.money_spawner.currency,
+                            amount=deposit,
+                        )
+                    )
 
             context = self._build_context(time, history, current_open_prices)
             snapshot_path = self.recorder.save_snapshot(step, context)
             decision = self.strategy.decide(context) or Decision()
 
-            cancelled_ids = self._cancel_open_orders(decision.cancel_order_ids)
+            cancelled_orders = self._cancel_open_orders(decision.cancel_order_ids)
+            for order in cancelled_orders:
+                journal.append(order_cancelled_entry(order=order))
+
             markets: list[Order] = []
             limits: list[Order] = []
             for order in decision.orders:
@@ -111,7 +127,14 @@ class Environment:
                 history[candle.ticker].append(candle)
                 last_candles[candle.ticker] = candle
 
-            filled_ids = self._fill_open_orders(current_candles)
+            for fill in self._fill_open_orders(current_candles):
+                journal.append(
+                    order_filled_entry(
+                        order=fill.order,
+                        quantity=fill.quantity,
+                        price=fill.price,
+                    )
+                )
 
             self.open_orders.extend(limits)
 
@@ -125,11 +148,9 @@ class Environment:
                     time,
                     last_prices,
                     decision,
-                    cancelled_ids,
-                    filled_ids,
+                    journal,
                     equity,
                     snapshot_path,
-                    deposit,
                 )
             )
 
@@ -162,19 +183,19 @@ class Environment:
             },
         )
 
-    def _cancel_open_orders(self, cancel_ids: list[str]) -> list[str]:
+    def _cancel_open_orders(self, cancel_ids: list[str]) -> list[Order]:
         if not cancel_ids:
             return []
         cancel_set = set(cancel_ids)
-        cancelled = [order.id for order in self.open_orders if order.id in cancel_set]
+        cancelled = [order for order in self.open_orders if order.id in cancel_set]
         self.open_orders = [
             order for order in self.open_orders if order.id not in cancel_set
         ]
         return cancelled
 
-    def _fill_open_orders(self, candles: dict[str, Candle]) -> list[str]:
+    def _fill_open_orders(self, candles: dict[str, Candle]) -> list[Fill]:
         still_open: list[Order] = []
-        filled_ids: list[str] = []
+        fills: list[Fill] = []
 
         for order in self.open_orders:
             candle = candles.get(order.ticker)
@@ -190,18 +211,19 @@ class Environment:
                 raise ValueError(f"Unsupported order type: {order.order_type}")
 
             if should_fill:
-                self.mock_executor.execute(
-                    [order],
-                    self.account,
-                    self.positions,
-                    candles,
+                fills.extend(
+                    self.mock_executor.execute(
+                        [order],
+                        self.account,
+                        self.positions,
+                        candles,
+                    )
                 )
-                filled_ids.append(order.id)
             else:
                 still_open.append(order)
 
         self.open_orders = still_open
-        return filled_ids
+        return fills
 
     def _build_context(
         self,
@@ -232,24 +254,14 @@ class Environment:
         time: datetime,
         prices: dict[str, Decimal],
         decision: Decision,
-        cancelled_ids: list[str],
-        filled_ids: list[str],
+        journal: list[dict],
         equity: Decimal,
         snapshot_path: Path | None,
-        deposit: Decimal | None = None,
     ) -> dict:
         record = {
             "step": step,
             "time": str(time),
             "prices": {ticker: str(price) for ticker, price in prices.items()},
-            "deposit": (
-                None
-                if deposit is None
-                else {
-                    "currency": self.money_spawner.currency,
-                    "amount": str(deposit),
-                }
-            ),
             "decision": [
                 {
                     "id": order.id,
@@ -264,8 +276,7 @@ class Environment:
                 }
                 for order in decision.orders
             ],
-            "cancel_order_ids": cancelled_ids,
-            "filled_order_ids": filled_ids,
+            "journal": journal,
             "open_orders": [
                 {
                     "id": order.id,
