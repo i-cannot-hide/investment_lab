@@ -31,7 +31,7 @@ _MARKER_STYLE = {
     },
     EntryType.DEPOSIT.value: {
         "name": "deposit",
-        "symbol": "diamond",
+        "symbol": "diamond-open",
         "color": "#2ca02c",
         "hover": "DEPOSIT",
     },
@@ -105,12 +105,10 @@ def _add_journal_traces(
             shown_legend.add(name)
         hover = style["hover"]
         if extra_hover:
-            hover_template = (
-                f"{hover} %{{customdata}}<br>%{{x|%Y-%m-%d}}<extra></extra>"
-            )
+            hover_template = f"{hover} %{{customdata}}<extra></extra>"
             customdata = rows[extra_hover]
         else:
-            hover_template = f"{hover}<br>%{{x|%Y-%m-%d}}<extra></extra>"
+            hover_template = f"{hover}<extra></extra>"
             customdata = None
         fig.add_trace(
             go.Scatter(
@@ -125,6 +123,7 @@ def _add_journal_traces(
                     "symbol": style["symbol"],
                     "size": 10,
                     "color": style["color"],
+                    "line": {"width": 1, "color": style["color"]},
                 },
                 hovertemplate=hover_template,
                 customdata=customdata,
@@ -203,7 +202,6 @@ def plot_series(
                 line={"color": color},
                 hovertemplate=(
                     f"<b>{name}</b><br>"
-                    "%{x|%Y-%m-%d}<br>"
                     f"{column}: %{{y:,.2f}}"
                     "<extra></extra>"
                 ),

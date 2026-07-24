@@ -143,3 +143,14 @@ def test_ignores_other_assets_when_buying_btc():
     assert len(decision.orders) == 1
     assert decision.orders[0].ticker == "BTC"
     assert decision.orders[0].total_value == Decimal("10000")
+
+
+def test_buys_only_once():
+    strategy = HoldStrategy()
+
+    first = strategy.decide(make_context(usd="10000", open_price="25000"))
+    second = strategy.decide(make_context(usd="1000", open_price="26000"))
+
+    assert first is not None
+    assert len(first.orders) == 1
+    assert second is None

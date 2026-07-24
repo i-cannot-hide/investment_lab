@@ -31,6 +31,16 @@ research = Research(
             strategy=InvestEverythingStrategy(ticker="BTC"),
             name="invest_everything",
         ),
+
+        Experiment(
+            strategy=InvestEverythingStrategy(ticker="BTC"),
+            name="invest_everything",
+            money_spawner=MoneySpawner(
+                currency="USD",
+                amount=1000,
+                interval=SpawnInterval.MONTH,
+            ),
+        ),
         Experiment(
             strategy=BuyBelowStrategy(target_price=20000, ticker="BTC"),
             name="buybelow",
@@ -56,7 +66,7 @@ if not data_files:
 research_id = research.run(
     data_files,
     full_debug_outcomes=False,
-    start_date="2023-01-01",
+    start_date="2021-02-20",
     end_date="2024-12-31",
     initial_usd=10_000,
 )

@@ -9,8 +9,12 @@ MIN_USD = Decimal("10.00")
 class HoldStrategy:
     def __init__(self, ticker: str = "BTC"):
         self.ticker = ticker
+        self._bought = False
 
     def decide(self, context: Context) -> Decision | None:
+        if self._bought:
+            return None
+
         usd = context.account.balances.get("USD", Decimal("0"))
         if usd < MIN_USD:
             return None
@@ -19,6 +23,7 @@ class HoldStrategy:
         if price is None or price <= 0:
             return None
 
+        self._bought = True
         return Decision(
             orders=[
                 Order(
