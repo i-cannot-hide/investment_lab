@@ -13,10 +13,43 @@ SERIES_LEGEND = "legend"
 # Plotly cannot natively "toggle whole group on parent click, item on child
 # click". This hook makes a series-line legend click hide/show that series'
 # entry markers too; entry clicks keep default per-item toggle.
+# Also reapplies marker y_shift_px (screen pixels) after plot/zoom — scatter
+# has no pixel offset API, and SVG path tricks get re-centered by Plotly.
 _SERIES_LEGEND_CLICK_SCRIPT = """
 var gd = document.getElementById('{plot_id}');
 if (!gd || gd._seriesLegendHooked) return;
 gd._seriesLegendHooked = true;
+
+function applyMarkerPixelOffsets(gd) {
+  if (gd._buyOffsetApplying) return;
+  var yaxis = gd._fullLayout && gd._fullLayout.yaxis;
+  if (!yaxis || !yaxis.d2l || !yaxis.l2p || !yaxis.p2l || !yaxis.l2d) return;
+  var rangeKey = JSON.stringify(yaxis.range);
+  if (gd._buyOffsetRangeKey === rangeKey) return;
+  var indices = [];
+  var ys = [];
+  gd.data.forEach(function(t, i) {
+    if (!t.meta || !t.meta.y_shift_px) return;
+    if (!t._baseY) {
+      t._baseY = (t.y || []).slice();
+    }
+    var shift = t.meta.y_shift_px;
+    var newY = t._baseY.map(function(yv) {
+      if (yv === null || yv === undefined) return yv;
+      var p = yaxis.l2p(yaxis.d2l(yv));
+      return yaxis.l2d(yaxis.p2l(p + shift));
+    });
+    indices.push(i);
+    ys.push(newY);
+  });
+  if (!indices.length) return;
+  gd._buyOffsetApplying = true;
+  gd._buyOffsetRangeKey = rangeKey;
+  Plotly.restyle(gd, {y: ys}, indices).then(function() {
+    gd._buyOffsetApplying = false;
+  });
+}
+
 gd.on('plotly_legendclick', function(e) {
   var t = gd.data[e.curveNumber];
   if (!t || !t.meta || t.meta.role !== 'series') {
@@ -36,6 +69,11 @@ gd.on('plotly_legendclick', function(e) {
   Plotly.restyle(gd, {visible: next}, indices);
   return false;
 });
+
+gd.on('plotly_afterplot', function() {
+  applyMarkerPixelOffsets(gd);
+});
+applyMarkerPixelOffsets(gd);
 """
 
 _USD_SERIES_COLUMNS = {
@@ -55,6 +93,9 @@ _MARKER_STYLE = {
         "BUY": {
             "name": "buy",
             "symbol": "triangle-up",
+            # Scatter markers are centered on the point; nudge the glyph down
+            # by half the marker size in screen pixels (size 10 → 5px).
+            "y_shift_px": 5,
             "color": "#00c853",
             "size": 10,
             "line_color": "#000000",
@@ -365,7 +406,12 @@ def _add_journal_traces(
                 legend=SERIES_LEGEND,
                 legendgroup=series,
                 showlegend=True,
-                meta={"role": "entry", "series": series, "entry": entry_name},
+                meta={
+                    "role": "entry",
+                    "series": series,
+                    "entry": entry_name,
+                    "y_shift_px": style.get("y_shift_px") or 0,
+                },
                 marker={
                     "symbol": style["symbol"],
                     "size": style["size"],
@@ -405,6 +451,59 @@ def _show_figure(fig: go.Figure) -> None:
     if "mimetype" in str(pio.renderers.default):
         kwargs["renderer"] = "notebook_connected"
     fig.show(**kwargs)
+
+
+def final_column_values(
+    outcomes: dict[str, pd.DataFrame],
+    column: str = "equity",
+) -> pd.Series:
+    """Last ``column`` value for each experiment (by outcome key)."""
+    if not outcomes:
+        raise ValueError("outcomes is empty")
+    values: dict[str, float] = {}
+    for name, steps in outcomes.items():
+        if steps.empty or column not in steps.columns:
+            raise ValueError(f"outcome {name!r} has no {column!r} column")
+        values[name] = float(steps[column].iloc[-1])
+    return pd.Series(values)
+
+
+def plot_final_equity_bars(
+    outcomes: dict[str, pd.DataFrame],
+    *,
+    column: str = "equity",
+    figsize=(10, 5),
+):
+    """Bar chart comparing each experiment's final ``column`` (default equity)."""
+    finals = final_column_values(outcomes, column)
+    colors = qualitative.Plotly
+    bar_colors = [colors[i % len(colors)] for i in range(len(finals))]
+
+    width = int(figsize[0] * 80)
+    height = int(figsize[1] * 80)
+    fig = go.Figure(
+        go.Bar(
+            x=list(finals.index),
+            y=finals.values,
+            marker_color=bar_colors,
+            text=[f"{v:,.2f}" for v in finals.values],
+            textposition="outside",
+            hovertemplate="<b>%{x}</b><br>" + column + ": %{y:,.2f}<extra></extra>",
+        )
+    )
+    fig.update_layout(
+        width=width,
+        height=height,
+        margin={"l": 60, "r": 20, "t": 40, "b": 80},
+        yaxis_title=f"final {column}",
+        xaxis_title=None,
+        plot_bgcolor="#fafafa",
+        paper_bgcolor="#ffffff",
+        showlegend=False,
+    )
+    fig.update_yaxes(tickformat=",.0f", rangemode="tozero")
+    fig.update_xaxes(tickangle=-30)
+    fig.show()
 
 
 def plot_series(

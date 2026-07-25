@@ -19,6 +19,37 @@ def _steps(*journals_by_day: list[dict]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def test_final_column_values_and_bar_chart_smoke():
+    from analysis.plotter import final_column_values, plot_final_equity_bars
+
+    outcomes = {
+        "a": pd.DataFrame({"time": [datetime(2023, 1, 1), datetime(2023, 1, 2)], "equity": [100.0, 120.0]}),
+        "b": pd.DataFrame({"time": [datetime(2023, 1, 1), datetime(2023, 1, 2)], "equity": [100.0, 90.0]}),
+    }
+    finals = final_column_values(outcomes, "equity")
+    assert list(finals.index) == ["a", "b"]
+    assert finals["a"] == 120.0
+    assert finals["b"] == 90.0
+
+    import analysis.plotter as plotter_mod
+
+    captured = {}
+    orig = plotter_mod.go.Figure.show
+
+    def fake_show(self, *args, **kwargs):
+        captured["fig"] = self
+
+    plotter_mod.go.Figure.show = fake_show
+    try:
+        plot_final_equity_bars(outcomes)
+    finally:
+        plotter_mod.go.Figure.show = orig
+
+    assert captured["fig"].data[0].type == "bar"
+    assert list(captured["fig"].data[0].x) == ["a", "b"]
+    assert list(captured["fig"].data[0].y) == [120.0, 90.0]
+
+
 def test_flatten_and_aggregate_keeps_single_entry_style():
     steps = _steps(
         [

@@ -408,7 +408,8 @@ def test_is_ath_indicator_visible_on_context_before_decide(tmp_path: Path):
     )
     environment.run()
 
-    assert strategy.flags == [True, True, False]
+    # IsAth uses bar low vs peak*(1-drop): day2 low 97 < 98 → False.
+    assert strategy.flags == [True, False, False]
 
     entries = load_registry(tmp_path / "outcomes")
     assert entries[0]["indicators"] == [
@@ -417,7 +418,7 @@ def test_is_ath_indicator_visible_on_context_before_decide(tmp_path: Path):
     steps_file = tmp_path / "outcomes" / entries[0]["folder"] / "steps.jsonl"
     steps = [json.loads(line) for line in steps_file.read_text().splitlines()]
     assert steps[0]["journal"][0]["IsATH"] is True
-    assert steps[1]["journal"][0]["IsATH"] is True
+    assert steps[1]["journal"][0]["IsATH"] is False
     assert steps[2]["journal"][0]["IsATH"] is False
 
 

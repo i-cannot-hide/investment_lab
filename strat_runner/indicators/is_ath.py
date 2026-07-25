@@ -8,9 +8,9 @@ from indicators.indicator import Indicator, IndicatorContext
 class IsAth(Indicator):
     """Near all-time-high flag for one ticker.
 
-    Uses each bar's **high**. A bar counts as ATH when::
+    Peak tracks each bar's **high**. A bar counts as ATH when::
 
-        high >= peak * (1 - acceptable_drop)
+        low >= peak * (1 - acceptable_drop)
 
     where ``peak`` is the highest high seen on prior bars (or this bar's high
     on the first observation). ``acceptable_drop`` is a fraction (0.02 → 2%).
@@ -43,13 +43,14 @@ class IsAth(Indicator):
             return []
 
         high = Decimal(str(candle.high))
+        low = Decimal(str(candle.low))
         if self._peak_high is None:
             peak = high
             is_ath = True
         else:
             peak = self._peak_high
             threshold = peak * (Decimal("1") - self.acceptable_drop)
-            is_ath = high >= threshold
+            is_ath = low >= threshold
 
         if self._peak_high is None or high > self._peak_high:
             self._peak_high = high

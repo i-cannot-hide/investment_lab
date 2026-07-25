@@ -9,7 +9,7 @@ from strategies.hold import HoldStrategy
 from strategies.invest_everything import InvestEverythingStrategy
 from strategies.buy_when_ath import BuyWhenAthStrategy
 
-ath_drop = 0.1
+ath_drop = 0.2
 
 research = Research(
     name="Investing at ATH",
@@ -63,7 +63,7 @@ if not data_files:
 research_id = research.run(
     data_files,
     full_debug_outcomes=False,
-    #start_date="1980-02-20",
+    #start_date="2020-02-01",
     #end_date="2024-12-31",
     initial_usd=10_000,
 )
