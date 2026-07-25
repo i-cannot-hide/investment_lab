@@ -19,7 +19,7 @@ from engine.journal import (
     order_cancelled_entry,
     order_filled_entry,
 )
-from engine.modifier import ModifierContext
+from modifiers.modifier import ModifierContext
 from engine.recorder import Recorder
 from engine.outcome_registry import (
     allocate_outcome_dir,

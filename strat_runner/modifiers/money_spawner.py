@@ -4,7 +4,7 @@ from decimal import Decimal
 from enum import Enum
 
 from engine.journal import deposit_entry
-from engine.modifier import ExperimentModifier, ModifierContext
+from modifiers.modifier import ExperimentModifier, ModifierContext
 from models import Account
 
 

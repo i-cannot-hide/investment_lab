@@ -241,6 +241,7 @@ strat_runner/
   main.py              # sample simulation entrypoint
   models.py            # Candle, Order, Decision, Context, …
   engine/              # Environment, Experiment, Research, registry, recorder
+  modifiers/           # MoneySpawner, Staker, ExperimentModifier
   strategies/          # Hold, BuyBelow, …
   executors/           # MockExecutor fill logic
   data/                # loaders, downloaders, preprocessed CSVs
@@ -265,7 +266,8 @@ Strategies implement `decide(context) -> Decision | None`:
 Pass an `Experiment` into `Environment` instead of a bare strategy:
 
 ```python
-from engine import Experiment, MoneySpawner, SpawnInterval
+from engine import Experiment
+from modifiers import MoneySpawner, SpawnInterval
 
 Experiment(
     strategy=BuyBelowStrategy(target_price=20000, ticker="BTC"),

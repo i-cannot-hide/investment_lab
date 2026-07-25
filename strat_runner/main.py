@@ -1,6 +1,7 @@
 from pathlib import Path
 
-from engine import Experiment, MoneySpawner, Research, SpawnInterval, Staker
+from engine import Experiment, Research
+from modifiers import MoneySpawner, SpawnInterval, Staker
 from strategies.do_nothing import DoNothingStrategy
 from strategies.hold import HoldStrategy
 from strategies.invest_everything import InvestEverythingStrategy

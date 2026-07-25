@@ -29,7 +29,7 @@ py-modules = ["models"]
 
 [tool.setuptools.packages.find]
 where = ["strat_runner"]
-include = ["engine*", "strategies*", "executors*", "data*", "analysis*"]
+include = ["engine*", "modifiers*", "strategies*", "executors*", "data*", "analysis*"]
 
 [tool.pytest.ini_options]
 testpaths = ["strat_runner/tests"]

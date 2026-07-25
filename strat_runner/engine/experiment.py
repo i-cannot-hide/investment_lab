@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 
-from engine.modifier import ExperimentModifier
+from modifiers.modifier import ExperimentModifier
 
 
 @dataclass

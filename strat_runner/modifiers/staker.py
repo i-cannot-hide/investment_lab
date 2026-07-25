@@ -3,8 +3,8 @@ from datetime import datetime
 from decimal import Decimal
 
 from engine.journal import interest_entry
-from engine.modifier import ExperimentModifier, ModifierContext
-from engine.money_spawner import SpawnInterval
+from modifiers.modifier import ExperimentModifier, ModifierContext
+from modifiers.money_spawner import SpawnInterval
 from models import Account, Position
 
 
