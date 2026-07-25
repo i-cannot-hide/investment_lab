@@ -12,9 +12,9 @@ from engine.outcome_registry import (
 )
 from engine.recorder import Recorder
 from engine.research import Research
+from indicators import Indicator, IndicatorContext, IsAth
 from modifiers import (
     ExperimentModifier,
-    IsAth,
     ModifierContext,
     MoneySpawner,
     SpawnInterval,
@@ -26,6 +26,8 @@ __all__ = [
     "Environment",
     "Experiment",
     "ExperimentModifier",
+    "Indicator",
+    "IndicatorContext",
     "IsAth",
     "ModifierContext",
     "MoneySpawner",

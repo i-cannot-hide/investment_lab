@@ -7,6 +7,7 @@ import pytest
 from engine import (
     Environment,
     Experiment,
+    IsAth,
     MoneySpawner,
     SpawnInterval,
     Staker,
@@ -44,6 +45,7 @@ class RecordingStrategy:
                 account=Account(balances=dict(context.account.balances)),
                 positions=list(context.positions),
                 open_orders=list(context.open_orders),
+                indicators=list(context.indicators),
             )
         )
         return self.strategy.decide(context)
@@ -372,6 +374,51 @@ def test_new_limit_waits_until_next_bar_to_fill(tmp_path: Path):
 class NoOpStrategy:
     def decide(self, context: Context) -> None:
         return None
+
+
+def test_is_ath_indicator_visible_on_context_before_decide(tmp_path: Path):
+    csv_path = tmp_path / "spx.csv"
+    lines = ["time,ticker,open,high,low,close,volume"]
+    rows = [
+        ("2023-01-01", "100", "100", "99", "100"),
+        ("2023-01-02", "98", "98", "97", "98"),
+        ("2023-01-03", "97", "97", "96", "97"),
+    ]
+    for time, open_, high, low, close in rows:
+        lines.append(f"{time},SPX,{open_},{high},{low},{close},1")
+    csv_path.write_text("\n".join(lines) + "\n")
+
+    class CaptureAth(NoOpStrategy):
+        def __init__(self):
+            self.flags: list[bool | None] = []
+
+        def decide(self, context: Context) -> None:
+            assert len(context.indicators) == 1
+            assert isinstance(context.indicators[0], IsAth)
+            self.flags.append(context.indicators[0].is_ath)
+            return None
+
+    strategy = CaptureAth()
+    ath = IsAth(ticker="SPX", acceptable_drop="0.02")
+    environment = Environment(
+        Experiment(strategy, indicators=[ath]),
+        MockExecutor(),
+        [str(csv_path)],
+        outcomes_dir=tmp_path / "outcomes",
+    )
+    environment.run()
+
+    assert strategy.flags == [True, True, False]
+
+    entries = load_registry(tmp_path / "outcomes")
+    assert entries[0]["indicators"] == [
+        {"type": "IsAth", "ticker": "SPX", "acceptable_drop": "0.02"}
+    ]
+    steps_file = tmp_path / "outcomes" / entries[0]["folder"] / "steps.jsonl"
+    steps = [json.loads(line) for line in steps_file.read_text().splitlines()]
+    assert steps[0]["journal"][0]["IsATH"] is True
+    assert steps[1]["journal"][0]["IsATH"] is True
+    assert steps[2]["journal"][0]["IsATH"] is False
 
 
 def test_money_spawner_credits_before_decide(tmp_path: Path):

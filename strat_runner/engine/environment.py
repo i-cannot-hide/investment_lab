@@ -19,6 +19,7 @@ from engine.journal import (
     order_cancelled_entry,
     order_filled_entry,
 )
+from indicators.indicator import IndicatorContext
 from modifiers.modifier import ModifierContext
 from engine.recorder import Recorder
 from engine.outcome_registry import (
@@ -48,6 +49,7 @@ class Environment:
         self.experiment = experiment
         self.strategy = experiment.strategy
         self.modifiers = list(experiment.modifiers)
+        self.indicators = list(experiment.indicators)
         self.mock_executor = mock_executor
         self.full_debug_outcomes = full_debug_outcomes
         self.interval = interval
@@ -107,6 +109,17 @@ class Environment:
             )
             for modifier in self.modifiers:
                 journal.extend(modifier.on_bar_start(modifier_ctx))
+
+            indicator_ctx = IndicatorContext(
+                time=time,
+                bar_candles=current_candles,
+                history={
+                    ticker: list(candles) for ticker, candles in history.items()
+                },
+                is_last_bar=is_last_bar,
+            )
+            for indicator in self.indicators:
+                journal.extend(indicator.update(indicator_ctx))
 
             context = self._build_context(time, history, current_open_prices)
             snapshot_path = self.recorder.save_snapshot(step, context)
@@ -177,6 +190,9 @@ class Environment:
                 "params": strategy_params(self.strategy),
                 "modifiers": [
                     modifier.registry_record() for modifier in self.modifiers
+                ],
+                "indicators": [
+                    indicator.registry_record() for indicator in self.indicators
                 ]
                 or None,
                 "start_date": times[0].strftime("%Y-%m-%d"),
@@ -353,6 +369,8 @@ class Environment:
                 if position.quantity > 0
             ],
             open_orders=[self._copy_order(order) for order in self.open_orders],
+            # Same indicator instances (already updated this bar); list copy only.
+            indicators=list(self.indicators),
         )
 
     def _mark_to_market(self, prices: dict[str, Decimal]) -> Decimal:

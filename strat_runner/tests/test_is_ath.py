@@ -3,12 +3,12 @@ from decimal import Decimal
 
 import pytest
 
-from engine import IsAth, ModifierContext
+from engine import IndicatorContext, IsAth
 from engine.journal import EntryType
-from models import Account, Candle
+from models import Candle
 
 
-def _ctx(high: str, *, ticker: str = "SPX") -> ModifierContext:
+def _ctx(high: str, *, ticker: str = "SPX") -> IndicatorContext:
     candle = Candle(
         time=datetime(2020, 1, 1),
         ticker=ticker,
@@ -18,12 +18,10 @@ def _ctx(high: str, *, ticker: str = "SPX") -> ModifierContext:
         close=Decimal(high),
         volume=Decimal("0"),
     )
-    return ModifierContext(
+    return IndicatorContext(
         time=candle.time,
-        account=Account(balances={"USD": Decimal("0")}),
-        positions=[],
-        open_orders=[],
         bar_candles={ticker: candle},
+        history={},
         is_last_bar=False,
     )
 
@@ -42,7 +40,8 @@ def test_rejects_invalid_acceptable_drop():
 
 def test_first_bar_is_ath_and_sets_peak():
     marker = IsAth(ticker="SPX", acceptable_drop="0.02")
-    entries = marker.on_bar_end(_ctx("100"))
+    entries = marker.update(_ctx("100"))
+    assert marker.is_ath is True
     assert entries == [
         {
             "type": EntryType.IS_ATH.value,
@@ -57,34 +56,39 @@ def test_first_bar_is_ath_and_sets_peak():
 
 def test_acceptable_drop_band():
     marker = IsAth(ticker="SPX", acceptable_drop="0.02")
-    marker.on_bar_end(_ctx("100"))
+    marker.update(_ctx("100"))
 
-    near = marker.on_bar_end(_ctx("98"))
+    near = marker.update(_ctx("98"))
+    assert marker.is_ath is True
     assert near[0]["IsATH"] is True
     assert near[0]["peak"] == "100"
 
-    below = marker.on_bar_end(_ctx("97.99"))
+    below = marker.update(_ctx("97.99"))
+    assert marker.is_ath is False
     assert below[0]["IsATH"] is False
     assert below[0]["peak"] == "100"
 
 
 def test_new_high_updates_peak():
     marker = IsAth(ticker="SPX", acceptable_drop="0.04")
-    marker.on_bar_end(_ctx("100"))
-    marker.on_bar_end(_ctx("110"))
+    marker.update(_ctx("100"))
+    marker.update(_ctx("110"))
 
-    near_new_peak = marker.on_bar_end(_ctx("105.6"))
+    near_new_peak = marker.update(_ctx("105.6"))
+    assert marker.is_ath is True
     assert near_new_peak[0]["IsATH"] is True
     assert near_new_peak[0]["peak"] == "110"
 
-    below_new_peak = marker.on_bar_end(_ctx("105.5"))
+    below_new_peak = marker.update(_ctx("105.5"))
+    assert marker.is_ath is False
     assert below_new_peak[0]["IsATH"] is False
 
 
 def test_skips_missing_ticker():
     marker = IsAth(ticker="SPX")
     ctx = _ctx("100", ticker="BTC")
-    assert marker.on_bar_end(ctx) == []
+    assert marker.update(ctx) == []
+    assert marker.is_ath is None
 
 
 def test_registry_record():

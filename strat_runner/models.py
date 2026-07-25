@@ -95,3 +95,4 @@ class Context:
     account: Account
     positions: list[Position]
     open_orders: list[Order] = field(default_factory=list)
+    indicators: list = field(default_factory=list)

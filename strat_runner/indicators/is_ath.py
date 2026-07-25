@@ -2,12 +2,12 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 
 from engine.journal import is_ath_entry
-from modifiers.modifier import ExperimentModifier, ModifierContext
+from indicators.indicator import Indicator, IndicatorContext
 
 
 @dataclass
-class IsAth(ExperimentModifier):
-    """Mark bars near the running all-time high for one ticker.
+class IsAth(Indicator):
+    """Near all-time-high flag for one ticker.
 
     Uses each bar's **high**. A bar counts as ATH when::
 
@@ -16,11 +16,12 @@ class IsAth(ExperimentModifier):
     where ``peak`` is the highest high seen on prior bars (or this bar's high
     on the first observation). ``acceptable_drop`` is a fraction (0.02 → 2%).
 
-    Writes an ``is_ath`` journal entry every bar with boolean field ``IsATH``.
+    After ``update``, read ``is_ath`` (bool | None). Also journals ``IsATH``.
     """
 
     ticker: str
     acceptable_drop: Decimal | float | str | int = 0
+    is_ath: bool | None = field(default=None, init=False)
     _peak_high: Decimal | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self):
@@ -34,9 +35,10 @@ class IsAth(ExperimentModifier):
                 f"got {self.acceptable_drop}"
             )
 
-    def on_bar_end(self, ctx: ModifierContext) -> list[dict]:
+    def update(self, ctx: IndicatorContext) -> list[dict]:
         candle = ctx.bar_candles.get(self.ticker)
         if candle is None:
+            self.is_ath = None
             return []
 
         high = Decimal(str(candle.high))
@@ -51,6 +53,7 @@ class IsAth(ExperimentModifier):
         if self._peak_high is None or high > self._peak_high:
             self._peak_high = high
 
+        self.is_ath = is_ath
         return [
             is_ath_entry(
                 ticker=self.ticker,
