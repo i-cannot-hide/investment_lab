@@ -58,6 +58,15 @@ def test_buys_market_when_ath():
     assert order.total_value == Decimal("10000")
 
 
+def test_should_buy_false_buys_only_when_not_ath():
+    strategy = BuyWhenAthStrategy(should_buy=False)
+    assert strategy.decide(make_context(indicators=[_ath(is_ath=True)])) is None
+
+    decision = strategy.decide(make_context(indicators=[_ath(is_ath=False)]))
+    assert decision is not None
+    assert decision.orders[0].total_value == Decimal("10000")
+
+
 def test_returns_none_when_below_min_usd_even_if_ath():
     strategy = BuyWhenAthStrategy()
     just_below = MIN_USD - Decimal("0.01")

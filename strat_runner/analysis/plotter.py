@@ -6,9 +6,37 @@ from enum import Enum
 
 from engine.journal import EntryType
 
-# Plotly only accepts legend / legend2 / … as legend ids.
+# Single legend so entry symbols toggle on click. Plotly's secondary legends
+# (legend2) have historically broken / inconsistent itemclick behavior.
 SERIES_LEGEND = "legend"
-ENTRIES_LEGEND = "legend2"
+
+# Plotly cannot natively "toggle whole group on parent click, item on child
+# click". This hook makes a series-line legend click hide/show that series'
+# entry markers too; entry clicks keep default per-item toggle.
+_SERIES_LEGEND_CLICK_SCRIPT = """
+var gd = document.getElementById('{plot_id}');
+if (!gd || gd._seriesLegendHooked) return;
+gd._seriesLegendHooked = true;
+gd.on('plotly_legendclick', function(e) {
+  var t = gd.data[e.curveNumber];
+  if (!t || !t.meta || t.meta.role !== 'series') {
+    return;
+  }
+  var series = t.meta.series;
+  var hiding = (t.visible !== false && t.visible !== 'legendonly');
+  var next = hiding ? 'legendonly' : true;
+  var indices = [];
+  for (var i = 0; i < gd.data.length; i++) {
+    var d = gd.data[i];
+    if (d.meta && d.meta.series === series) {
+      indices.push(i);
+    }
+  }
+  if (!indices.length) return;
+  Plotly.restyle(gd, {visible: next}, indices);
+  return false;
+});
+"""
 
 _USD_SERIES_COLUMNS = {
     "equity",
@@ -92,12 +120,14 @@ _AGGREGATE_STYLE = {
     "name": "events",
     "symbol": "circle",
     "color": "#455a64",
-    "size": 12,
+    "size": 10,
     "line_color": "#000000",
     "line_width": 1,
     "hover": "EVENTS",
-    "text_only": True,
 }
+
+# Relative y stagger so same-timestamp markers stay visible together.
+_STACK_Y_FRAC = 0.03
 
 
 def flatten_journal(steps: pd.DataFrame) -> pd.DataFrame:
@@ -227,11 +257,12 @@ def _hover_line(entry: pd.Series) -> str:
     return body
 
 
-def _series_y_at(frame: pd.DataFrame, time, column: str) -> float | None:
-    match = frame.loc[frame["time"] == time, column]
-    if match.empty or pd.isna(match.iloc[0]):
-        return None
-    return float(match.iloc[0])
+def _stack_marker_y(base_y: float, index: int, count: int) -> float:
+    """Spread same-timestamp markers vertically around ``base_y``."""
+    if count <= 1 or base_y == 0:
+        return base_y
+    center = (count - 1) / 2
+    return base_y * (1 + _STACK_Y_FRAC * (index - center))
 
 
 def aggregate_journal_markers(
@@ -239,10 +270,10 @@ def aggregate_journal_markers(
     frame: pd.DataFrame,
     column: str,
 ) -> list[dict]:
-    """Collapse same-day journal entries into one marker each.
+    """Build one marker per journal entry.
 
-    Single-entry days keep that entry's style and y. Multi-entry days use the
-    aggregate style, series y, a count label, and a combined hover list.
+    Same-timestamp entries keep their individual styles and are staggered in y
+    so every marker stays visible.
     """
     if journal.empty:
         return []
@@ -257,46 +288,36 @@ def aggregate_journal_markers(
         ]
         if not rows:
             continue
-        if len(rows) == 1:
-            entry = rows[0]
+
+        prepared: list[tuple[pd.Series, float, dict]] = []
+        for entry in rows:
             y = _marker_y(entry, frame, column)
-            if y is None:
-                continue
             style = _style_for_entry(entry)
+            if y is None or style is None:
+                continue
+            prepared.append((entry, y, style))
+
+        count = len(prepared)
+        for index, (entry, y, style) in enumerate(prepared):
+            experiment = entry.get("experiment")
+            series = (
+                str(experiment)
+                if experiment is not None
+                and not (isinstance(experiment, float) and pd.isna(experiment))
+                and str(experiment)
+                else None
+            )
             markers.append(
                 {
                     "time": time,
-                    "y": y,
+                    "y": _stack_marker_y(y, index, count),
                     "style": style,
                     "text": "",
                     "hover": _hover_line(entry),
                     "count": 1,
+                    "series": series,
                 }
             )
-            continue
-
-        y = _series_y_at(frame, time, column)
-        if y is None:
-            # Fall back to first entry that has a y.
-            for entry in rows:
-                y = _marker_y(entry, frame, column)
-                if y is not None:
-                    break
-        if y is None:
-            continue
-
-        count = len(rows)
-        lines = [f"{count} entries", *(_hover_line(entry) for entry in rows)]
-        markers.append(
-            {
-                "time": time,
-                "y": y,
-                "style": _AGGREGATE_STYLE,
-                "text": str(count),
-                "hover": "<br>".join(lines),
-                "count": count,
-            }
-        )
     return markers
 
 
@@ -305,11 +326,17 @@ def series_journal_customdata(
     markers: list[dict],
 ) -> list[str]:
     """Per-timestamp hover suffix for the series line (empty if no entries)."""
-    by_time = {pd.Timestamp(marker["time"]): marker["hover"] for marker in markers}
+    by_time: dict[pd.Timestamp, list[str]] = {}
+    for marker in markers:
+        by_time.setdefault(pd.Timestamp(marker["time"]), []).append(marker["hover"])
+
     customdata: list[str] = []
     for time in times:
-        hover = by_time.get(pd.Timestamp(time))
-        customdata.append(f"<br>{hover}" if hover else "")
+        lines = by_time.get(pd.Timestamp(time))
+        if not lines:
+            customdata.append("")
+            continue
+        customdata.append("<br>" + "<br>".join(lines))
     return customdata
 
 
@@ -317,9 +344,9 @@ def _add_journal_traces(
     fig: go.Figure,
     markers: list[dict],
     *,
-    shown_legend: set[str],
+    series: str,
 ):
-    """Draw journal markers only — hover details live on the series line."""
+    """Draw journal markers for one series under that series' legend group."""
     if not markers:
         return
 
@@ -327,40 +354,21 @@ def _add_journal_traces(
     for marker in markers:
         by_name.setdefault(marker["style"]["name"], []).append(marker)
 
-    for name, group in by_name.items():
+    for entry_name, group in by_name.items():
         style = group[0]["style"]
-        show_legend = name not in shown_legend
-        if show_legend:
-            shown_legend.add(name)
-        texts = [marker["text"] for marker in group]
-        text_only = style.get("text_only", False)
-        if text_only:
-            mode = "text"
-            textposition = "middle center"
-        elif any(texts):
-            mode = "markers+text"
-            textposition = "top center"
-        else:
-            mode = "markers"
-            textposition = "top center"
         fig.add_trace(
             go.Scatter(
                 x=[marker["time"] for marker in group],
                 y=[marker["y"] for marker in group],
-                mode=mode,
-                name=name,
-                legend=ENTRIES_LEGEND,
-                legendgroup=name,
-                showlegend=show_legend,
-                text=texts if text_only or any(texts) else None,
-                textposition=textposition,
-                textfont={"size": 12, "color": style["color"]},
+                mode="markers",
+                name=entry_name,
+                legend=SERIES_LEGEND,
+                legendgroup=series,
+                showlegend=True,
+                meta={"role": "entry", "series": series, "entry": entry_name},
                 marker={
                     "symbol": style["symbol"],
-                    "size": [
-                        min(style["size"] + 2 * (marker["count"] - 1), 18)
-                        for marker in group
-                    ],
+                    "size": style["size"],
                     "color": style["color"],
                     "line": {
                         "width": style.get("line_width", 1),
@@ -372,6 +380,31 @@ def _add_journal_traces(
                 hoverinfo="skip",
             )
         )
+
+
+def _legend_layout(*, has_groups: bool) -> dict:
+    return {
+        "orientation": "h",
+        "yanchor": "top",
+        "y": -0.38,
+        "x": 0,
+        "traceorder": "grouped",
+        "groupclick": "toggleitem",
+        "itemclick": "toggle",
+        "itemdoubleclick": "toggleothers",
+        "tracegroupgap": 16 if has_groups else 10,
+    }
+
+
+def _show_figure(fig: go.Figure) -> None:
+    import plotly.io as pio
+
+    kwargs: dict = {"post_script": [_SERIES_LEGEND_CLICK_SCRIPT]}
+    # plotly_mimetype drops post_script; force HTML so the series↔entries
+    # legend hook actually runs in Jupyter / VS Code / Cursor notebooks.
+    if "mimetype" in str(pio.renderers.default):
+        kwargs["renderer"] = "notebook_connected"
+    fig.show(**kwargs)
 
 
 def plot_series(
@@ -388,8 +421,11 @@ def plot_series(
     to overlay multiple series. Hover a point to see its date and value.
 
     Pass `journal` as a list of `EntryType` values to overlay matching
-    journal entries as markers on each series. Same-day entries are
-    collapsed into one marker; hover on that date lists every entry.
+    journal entries as markers on each series. Same-day entries each keep
+    their own marker (staggered in y); hover on that date lists every entry.
+
+    Legend groups each series with its entry symbols. Toggling a series hides
+    its entries too; toggling an entry symbol affects only that series.
 
     `scale` is ``Scale.LOG`` (default) or ``Scale.LINEAR``.
     """
@@ -403,12 +439,12 @@ def plot_series(
     entry_types = _entry_type_values(journal)
 
     fig = go.Figure()
-    shown_legend: set[str] = set()
+    multi_series = len(series) > 1 or any(label != "_" for label in series)
     for index, (label, df) in enumerate(series.items()):
         frame = df.copy()
         frame["time"] = pd.to_datetime(frame["time"])
         frame[column] = frame[column].astype(float)
-        name = column if label == "_" else label
+        series_name = column if label == "_" else label
         color = colors[index % len(colors)]
 
         markers: list[dict] = []
@@ -418,52 +454,48 @@ def plot_series(
                 entries = entries[entries["type"].isin(entry_types)]
                 if not entries.empty:
                     markers = aggregate_journal_markers(entries, frame, column)
+                    for marker in markers:
+                        marker["series"] = series_name
 
         fig.add_trace(
             go.Scatter(
                 x=frame["time"],
                 y=frame[column],
                 mode="lines",
-                name=name,
+                name=column,
                 legend=SERIES_LEGEND,
+                legendgroup=series_name,
+                legendgrouptitle_text=(
+                    series_name if (multi_series or markers) else None
+                ),
+                meta={"role": "series", "series": series_name},
                 line={"color": color},
                 customdata=series_journal_customdata(frame["time"], markers),
                 hovertemplate=(
-                    f"<b>{name}</b><br>{column}: "
+                    f"<b>{series_name}</b><br>{column}: "
                     f"%{{y:{_series_y_hover_format(column)}}}%{{customdata}}"
                     f"<extra></extra>"
                 ),
             )
         )
-
         if markers:
-            _add_journal_traces(fig, markers, shown_legend=shown_legend)
+            _add_journal_traces(fig, markers, series=series_name)
 
-    series_legend = {"orientation": "h", "yanchor": "top", "y": -0.38, "x": 0}
     layout = {
         "width": width,
         "height": height,
         "hovermode": "x unified",
-        "margin": {"l": 60, "r": 20, "t": 30, "b": 100},
-        SERIES_LEGEND: series_legend,
+        "margin": {"l": 60, "r": 20, "t": 30, "b": 120},
+        SERIES_LEGEND: _legend_layout(has_groups=True),
         "yaxis_title": f"{column} (log)" if scale is Scale.LOG else column,
         "xaxis_title": None,
         "plot_bgcolor": "#fafafa",
         "paper_bgcolor": "#ffffff",
     }
-    if shown_legend:
-        entries_legend = {
-            "orientation": "h",
-            "yanchor": "top",
-            "y": -0.8,
-            "x": 0,
-        }
-        layout["margin"] = {"l": 60, "r": 20, "t": 30, "b": 140}
-        layout[ENTRIES_LEGEND] = entries_legend
     fig.update_layout(**layout)
     fig.update_yaxes(type=scale.value, tickformat=",.0f")
     fig.update_xaxes(tickformat="%Y-%m-%d", tickangle=-45)
-    fig.show()
+    _show_figure(fig)
 
 
 def extract_ticker_ohlc(steps: pd.DataFrame, ticker: str) -> pd.DataFrame:
@@ -579,7 +611,6 @@ def plot_research_price(
                 markers = aggregate_journal_markers(entries, frame, bands[0])
 
     fig = go.Figure()
-    shown_legend: set[str] = set()
     customdata = series_journal_customdata(frame["time"], markers)
     for index, band in enumerate(bands):
         if band not in frame.columns:
@@ -592,6 +623,8 @@ def plot_research_price(
                 mode="lines",
                 name=name,
                 legend=SERIES_LEGEND,
+                legendgroup=name,
+                meta={"role": "series", "series": name},
                 line={"color": colors[index % len(colors)]},
                 customdata=customdata if index == 0 else [""] * len(frame),
                 hovertemplate=(
@@ -602,30 +635,53 @@ def plot_research_price(
             )
         )
 
-    if markers:
-        _add_journal_traces(fig, markers, shown_legend=shown_legend)
+    # One legend group per experiment; a parent legend item toggles that
+    # experiment's entry markers via the series-legend click hook.
+    experiments = sorted(
+        {
+            str(marker["series"])
+            for marker in markers
+            if marker.get("series")
+        }
+    )
+    if markers and not experiments:
+        experiments = ["entries"]
+        for marker in markers:
+            marker["series"] = "entries"
 
-    series_legend = {"orientation": "h", "yanchor": "top", "y": -0.38, "x": 0}
+    for experiment in experiments:
+        fig.add_trace(
+            go.Scatter(
+                x=[frame["time"].iloc[0]],
+                y=[float(frame[bands[0]].iloc[0])],
+                mode="markers",
+                name="all",
+                legend=SERIES_LEGEND,
+                legendgroup=experiment,
+                legendgrouptitle_text=experiment,
+                meta={"role": "series", "series": experiment},
+                marker={"size": 0.1, "opacity": 0, "color": "#000000"},
+                hoverinfo="skip",
+                showlegend=True,
+            )
+        )
+        exp_markers = [
+            marker for marker in markers if marker.get("series") == experiment
+        ]
+        _add_journal_traces(fig, exp_markers, series=experiment)
+
     layout = {
         "width": width,
         "height": height,
         "hovermode": "x unified",
-        "margin": {"l": 60, "r": 20, "t": 30, "b": 100},
-        SERIES_LEGEND: series_legend,
+        "margin": {"l": 60, "r": 20, "t": 30, "b": 140},
+        SERIES_LEGEND: _legend_layout(has_groups=True),
         "yaxis_title": f"{ticker} (log)" if scale is Scale.LOG else ticker,
         "xaxis_title": None,
         "plot_bgcolor": "#fafafa",
         "paper_bgcolor": "#ffffff",
     }
-    if shown_legend:
-        layout["margin"] = {"l": 60, "r": 20, "t": 30, "b": 140}
-        layout[ENTRIES_LEGEND] = {
-            "orientation": "h",
-            "yanchor": "top",
-            "y": -0.8,
-            "x": 0,
-        }
     fig.update_layout(**layout)
     fig.update_yaxes(type=scale.value, tickformat=",.0f")
     fig.update_xaxes(tickformat="%Y-%m-%d", tickangle=-45)
-    fig.show()
+    _show_figure(fig)

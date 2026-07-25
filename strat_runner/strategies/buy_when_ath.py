@@ -12,8 +12,10 @@ class BuyWhenAthStrategy(Strategy):
     def __init__(
         self,
         ticker: str = "BTC",
+        should_buy: bool = True,
     ):
         self.ticker = ticker
+        self.should_buy = bool(should_buy)
 
     def _require_is_ath(self, context: Context) -> bool:
         for indicator in context.indicators:
@@ -29,8 +31,9 @@ class BuyWhenAthStrategy(Strategy):
 
     def decide(self, context: Context) -> Decision | None:
         is_ath = self._require_is_ath(context)
-
-        if len(context.history) > 0 and len(context.history[self.ticker]) > 0 and not is_ath:
+        # should_buy=True  → buy only on ATH
+        # should_buy=False → buy only when not ATH
+        if is_ath != self.should_buy:
             return None
 
         usd = context.account.balances.get("USD", Decimal("0"))

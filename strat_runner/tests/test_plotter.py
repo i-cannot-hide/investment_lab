@@ -68,7 +68,7 @@ def test_false_is_ath_entries_are_not_plotted():
     assert markers[0]["hover"] == "ATH SPX"
 
 
-def test_same_day_entries_collapse_to_one_events_marker():
+def test_same_day_entries_each_keep_their_marker():
     steps = _steps(
         [
             {
@@ -99,15 +99,21 @@ def test_same_day_entries_collapse_to_one_events_marker():
     journal = flatten_journal(frame)
     markers = aggregate_journal_markers(journal, frame, "equity")
 
-    assert len(markers) == 1
-    marker = markers[0]
-    assert marker["style"]["name"] == "events"
-    assert marker["text"] == "3"
-    assert marker["count"] == 3
-    assert marker["y"] == 10000.0
-    assert marker["hover"] == (
-        "3 entries<br>DEPOSIT 1000 USD<br>INTEREST 40 USD<br>BUY BTC 0.5 @ 100"
-    )
+    assert len(markers) == 3
+    assert [marker["style"]["name"] for marker in markers] == [
+        "deposit",
+        "interest",
+        "buy",
+    ]
+    assert [marker["hover"] for marker in markers] == [
+        "DEPOSIT 1000 USD",
+        "INTEREST 40 USD",
+        "BUY BTC 0.5 @ 100",
+    ]
+    # Same base series y, staggered so all three remain visible.
+    ys = [marker["y"] for marker in markers]
+    assert len(set(ys)) == 3
+    assert min(ys) < 10000.0 < max(ys)
 
 
 def test_different_days_stay_separate():
@@ -133,14 +139,22 @@ def test_series_journal_customdata_only_on_event_days():
         {
             "time": times[1],
             "y": 100.0,
-            "style": {"name": "events"},
-            "text": "2",
-            "hover": "2 entries<br>DEPOSIT 1",
-            "count": 2,
-        }
+            "style": {"name": "deposit"},
+            "text": "",
+            "hover": "DEPOSIT 1",
+            "count": 1,
+        },
+        {
+            "time": times[1],
+            "y": 103.0,
+            "style": {"name": "interest"},
+            "text": "",
+            "hover": "INTEREST 2",
+            "count": 1,
+        },
     ]
     customdata = series_journal_customdata(times, markers)
-    assert customdata == ["", "<br>2 entries<br>DEPOSIT 1", ""]
+    assert customdata == ["", "<br>DEPOSIT 1<br>INTEREST 2", ""]
 
 
 def test_hover_number_decimals():
