@@ -17,7 +17,7 @@ from modifiers import (
     ExperimentModifier,
     ModifierContext,
     MoneySpawner,
-    SpawnInterval,
+    ActionInterval,
     Staker,
 )
 
@@ -31,7 +31,7 @@ __all__ = [
     "IsAth",
     "ModifierContext",
     "MoneySpawner",
-    "SpawnInterval",
+    "ActionInterval",
     "Staker",
     "Recorder",
     "Research",

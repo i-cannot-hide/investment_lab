@@ -3,28 +3,28 @@ from decimal import Decimal
 
 import pytest
 
-from engine import SpawnInterval, Staker
+from engine import ActionInterval, Staker
 from models import Account, Position
 
 
 def test_rejects_empty_ticker():
     with pytest.raises(ValueError, match="ticker"):
-        Staker(ticker="", rate="0.01", interval=SpawnInterval.MONTH)
+        Staker(ticker="", rate="0.01", interval=ActionInterval.MONTH)
 
 
 def test_rejects_negative_rate():
     with pytest.raises(ValueError, match="non-negative"):
-        Staker(ticker="USD", rate="-0.01", interval=SpawnInterval.MONTH)
+        Staker(ticker="USD", rate="-0.01", interval=ActionInterval.MONTH)
 
 
 def test_rejects_non_enum_interval():
-    with pytest.raises(TypeError, match="SpawnInterval"):
+    with pytest.raises(TypeError, match="ActionInterval"):
         Staker(ticker="USD", rate="0.01", interval="1M")  # type: ignore[arg-type]
 
 
 def test_available_uses_cash_balance_and_free_position():
-    staker_usd = Staker(ticker="USD", rate="0.01", interval=SpawnInterval.MONTH)
-    staker_btc = Staker(ticker="BTC", rate="0.01", interval=SpawnInterval.MONTH)
+    staker_usd = Staker(ticker="USD", rate="0.01", interval=ActionInterval.MONTH)
+    staker_btc = Staker(ticker="BTC", rate="0.01", interval=ActionInterval.MONTH)
     account = Account(balances={"USD": Decimal("500")})
     positions = [
         Position(ticker="BTC", quantity=Decimal("2"), average_price=Decimal("100"))
@@ -33,7 +33,7 @@ def test_available_uses_cash_balance_and_free_position():
     assert staker_usd.available(account, positions) == Decimal("500")
     assert staker_btc.available(account, positions) == Decimal("2")
     assert (
-        Staker(ticker="ETH", rate="0.01", interval=SpawnInterval.MONTH).available(
+        Staker(ticker="ETH", rate="0.01", interval=ActionInterval.MONTH).available(
             account, positions
         )
         == Decimal("0")
@@ -42,7 +42,7 @@ def test_available_uses_cash_balance_and_free_position():
 
 def test_tracks_period_minimum_and_pays_on_roll():
     account = Account(balances={"USD": Decimal("1000")})
-    staker = Staker(ticker="USD", rate="0.10", interval=SpawnInterval.MONTH)
+    staker = Staker(ticker="USD", rate="0.10", interval=ActionInterval.MONTH)
 
     assert staker.settle_if_period_changed(datetime(2023, 1, 1), account, []) is None
     staker.observe(account, [])
@@ -59,7 +59,7 @@ def test_tracks_period_minimum_and_pays_on_roll():
 
 def test_settle_final_pays_open_period():
     account = Account(balances={"USD": Decimal("1000")})
-    staker = Staker(ticker="USD", rate="0.05", interval=SpawnInterval.MONTH)
+    staker = Staker(ticker="USD", rate="0.05", interval=ActionInterval.MONTH)
 
     staker.settle_if_period_changed(datetime(2023, 1, 1), account, [])
     staker.observe(account, [])
@@ -74,7 +74,7 @@ def test_coin_interest_dilutes_average_price():
     positions = [
         Position(ticker="BTC", quantity=Decimal("1"), average_price=Decimal("100"))
     ]
-    staker = Staker(ticker="BTC", rate="0.10", interval=SpawnInterval.MONTH)
+    staker = Staker(ticker="BTC", rate="0.10", interval=ActionInterval.MONTH)
 
     staker.settle_if_period_changed(datetime(2023, 1, 1), account, positions)
     staker.observe(account, positions)
@@ -87,7 +87,7 @@ def test_coin_interest_dilutes_average_price():
 
 def test_zero_rate_or_zero_principal_pays_nothing():
     account = Account(balances={"USD": Decimal("1000")})
-    staker = Staker(ticker="USD", rate="0", interval=SpawnInterval.DAY)
+    staker = Staker(ticker="USD", rate="0", interval=ActionInterval.DAY)
     staker.settle_if_period_changed(datetime(2023, 1, 1), account, [])
     staker.observe(account, [])
     assert staker.settle_final(account, []) is None

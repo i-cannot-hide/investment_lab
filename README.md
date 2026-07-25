@@ -189,9 +189,9 @@ Account-side hooks on an `Experiment` via `modifiers=[...]`. Each modifier may i
 Experiment(
     strategy=DoNothingStrategy(),
     modifiers=[
-        MoneySpawner(currency="USD", amount=1000, interval=SpawnInterval.MONTH),
-        Staker(ticker="USD", rate="0.004", interval=SpawnInterval.MONTH),
-        Staker(ticker="BTC", rate="0.002", interval=SpawnInterval.MONTH),
+        MoneySpawner(currency="USD", amount=1000, interval=ActionInterval.MONTH),
+        Staker(ticker="USD", rate="0.004", interval=ActionInterval.MONTH),
+        Staker(ticker="BTC", rate="0.002", interval=ActionInterval.MONTH),
     ],
 )
 ```
@@ -267,7 +267,7 @@ Pass an `Experiment` into `Environment` instead of a bare strategy:
 
 ```python
 from engine import Experiment
-from modifiers import MoneySpawner, SpawnInterval
+from modifiers import MoneySpawner, ActionInterval
 
 Experiment(
     strategy=BuyBelowStrategy(target_price=20000, ticker="BTC"),
@@ -275,7 +275,7 @@ Experiment(
         MoneySpawner(
             currency="USD",
             amount=1000,
-            interval=SpawnInterval.MONTH,
+            interval=ActionInterval.MONTH,
         ),
     ],
     name="buybelow+spawn",

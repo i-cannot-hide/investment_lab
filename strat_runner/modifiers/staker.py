@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from engine.journal import interest_entry
 from modifiers.modifier import ExperimentModifier, ModifierContext
-from modifiers.money_spawner import SpawnInterval
+from modifiers.money_spawner import ActionInterval
 from models import Account, Position
 
 
@@ -22,7 +22,7 @@ class Staker(ExperimentModifier):
 
     ticker: str
     rate: Decimal | float | str | int
-    interval: SpawnInterval
+    interval: ActionInterval
     _period: str | None = field(default=None, init=False, repr=False)
     _period_min: Decimal | None = field(default=None, init=False, repr=False)
 
@@ -33,18 +33,18 @@ class Staker(ExperimentModifier):
         self.rate = Decimal(str(self.rate))
         if self.rate < 0:
             raise ValueError("Staker rate must be non-negative")
-        if not isinstance(self.interval, SpawnInterval):
+        if not isinstance(self.interval, ActionInterval):
             raise TypeError(
-                f"interval must be SpawnInterval, got {type(self.interval)!r}"
+                f"interval must be ActionInterval, got {type(self.interval)!r}"
             )
 
     def period_key(self, time: datetime) -> str:
-        if self.interval == SpawnInterval.DAY:
+        if self.interval == ActionInterval.DAY:
             return time.strftime("%Y-%m-%d")
-        if self.interval == SpawnInterval.WEEK:
+        if self.interval == ActionInterval.WEEK:
             iso = time.isocalendar()
             return f"{iso.year}-W{iso.week:02d}"
-        if self.interval == SpawnInterval.MONTH:
+        if self.interval == ActionInterval.MONTH:
             return time.strftime("%Y-%m")
         raise ValueError(f"Unsupported interval: {self.interval}")
 

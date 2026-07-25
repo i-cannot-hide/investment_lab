@@ -4,27 +4,27 @@ from decimal import Decimal
 import pytest
 
 from models import Account
-from engine import MoneySpawner, SpawnInterval
+from engine import MoneySpawner, ActionInterval
 
 
 def test_rejects_non_positive_amount():
     with pytest.raises(ValueError, match="positive"):
-        MoneySpawner(currency="USD", amount=0, interval=SpawnInterval.MONTH)
+        MoneySpawner(currency="USD", amount=0, interval=ActionInterval.MONTH)
 
 
 def test_rejects_non_enum_interval():
-    with pytest.raises(TypeError, match="SpawnInterval"):
+    with pytest.raises(TypeError, match="ActionInterval"):
         MoneySpawner(currency="USD", amount=100, interval="1M")  # type: ignore[arg-type]
 
 
 def test_period_keys():
-    spawner = MoneySpawner(currency="USD", amount=100, interval=SpawnInterval.DAY)
+    spawner = MoneySpawner(currency="USD", amount=100, interval=ActionInterval.DAY)
     assert spawner.period_key(datetime(2023, 1, 15)) == "2023-01-15"
 
-    spawner = MoneySpawner(currency="USD", amount=100, interval=SpawnInterval.WEEK)
+    spawner = MoneySpawner(currency="USD", amount=100, interval=ActionInterval.WEEK)
     assert spawner.period_key(datetime(2023, 1, 2)) == "2023-W01"  # Monday
 
-    spawner = MoneySpawner(currency="USD", amount=100, interval=SpawnInterval.MONTH)
+    spawner = MoneySpawner(currency="USD", amount=100, interval=ActionInterval.MONTH)
     assert spawner.period_key(datetime(2023, 1, 15)) == "2023-01"
 
 
@@ -33,7 +33,7 @@ def test_monthly_spawns_once_per_month():
     spawner = MoneySpawner(
         currency="USD",
         amount=1000,
-        interval=SpawnInterval.MONTH,
+        interval=ActionInterval.MONTH,
     )
 
     assert spawner.spawn(datetime(2023, 1, 1), account) == Decimal("1000")
@@ -51,7 +51,7 @@ def test_daily_spawns_each_day():
     spawner = MoneySpawner(
         currency="USD",
         amount=50,
-        interval=SpawnInterval.DAY,
+        interval=ActionInterval.DAY,
     )
 
     assert spawner.spawn(datetime(2023, 1, 1), account) == Decimal("50")
@@ -65,7 +65,7 @@ def test_creates_currency_balance_if_missing():
     spawner = MoneySpawner(
         currency="EUR",
         amount=25,
-        interval=SpawnInterval.DAY,
+        interval=ActionInterval.DAY,
     )
 
     assert spawner.spawn(datetime(2023, 1, 1), account) == Decimal("25")

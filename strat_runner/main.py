@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from engine import Experiment, Research
 from indicators import IsAth
-from modifiers import MoneySpawner, SpawnInterval, Staker
+from modifiers import MoneySpawner, ActionInterval, Staker
 from strategies.do_nothing import DoNothingStrategy
 from strategies.hold import HoldStrategy
 from strategies.invest_everything import InvestEverythingStrategy
@@ -21,7 +21,7 @@ research = Research(
                 MoneySpawner(
                     currency="USD",
                     amount=1000,
-                    interval=SpawnInterval.MONTH,
+                    interval=ActionInterval.MONTH,
                 ),
             ],
         ),
@@ -33,9 +33,9 @@ research = Research(
                 MoneySpawner(
                     currency="USD",
                     amount=1000,
-                    interval=SpawnInterval.MONTH,
+                    interval=ActionInterval.MONTH,
                 ),
-                Staker("USD", rate=Decimal(0.004), interval=SpawnInterval.MONTH)
+                Staker("USD", rate=Decimal("0.004"), interval=ActionInterval.MONTH)
             ],
         ),
         Experiment(
@@ -46,9 +46,9 @@ research = Research(
                 MoneySpawner(
                     currency="USD",
                     amount=1000,
-                    interval=SpawnInterval.MONTH,
+                    interval=ActionInterval.MONTH,
                 ),
-                Staker("USD", rate=Decimal(0.004), interval=SpawnInterval.MONTH)
+                Staker("USD", rate=Decimal("0.004"), interval=ActionInterval.MONTH)
             ],
         ),
     ],

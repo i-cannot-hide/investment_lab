@@ -8,7 +8,7 @@ from modifiers.modifier import ExperimentModifier, ModifierContext
 from models import Account
 
 
-class SpawnInterval(Enum):
+class ActionInterval(Enum):
     DAY = "1D"
     WEEK = "1W"
     MONTH = "1M"
@@ -18,25 +18,25 @@ class SpawnInterval(Enum):
 class MoneySpawner(ExperimentModifier):
     currency: str
     amount: Decimal | float | str | int
-    interval: SpawnInterval
+    interval: ActionInterval
     _last_period: str | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self):
         self.amount = Decimal(str(self.amount))
         if self.amount <= 0:
             raise ValueError("MoneySpawner amount must be positive")
-        if not isinstance(self.interval, SpawnInterval):
+        if not isinstance(self.interval, ActionInterval):
             raise TypeError(
-                f"interval must be SpawnInterval, got {type(self.interval)!r}"
+                f"interval must be ActionInterval, got {type(self.interval)!r}"
             )
 
     def period_key(self, time: datetime) -> str:
-        if self.interval == SpawnInterval.DAY:
+        if self.interval == ActionInterval.DAY:
             return time.strftime("%Y-%m-%d")
-        if self.interval == SpawnInterval.WEEK:
+        if self.interval == ActionInterval.WEEK:
             iso = time.isocalendar()
             return f"{iso.year}-W{iso.week:02d}"
-        if self.interval == SpawnInterval.MONTH:
+        if self.interval == ActionInterval.MONTH:
             return time.strftime("%Y-%m")
         raise ValueError(f"Unsupported interval: {self.interval}")
 

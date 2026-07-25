@@ -9,7 +9,7 @@ from engine import (
     Experiment,
     IsAth,
     MoneySpawner,
-    SpawnInterval,
+    ActionInterval,
     Staker,
     load_registry,
 )
@@ -439,7 +439,7 @@ def test_money_spawner_credits_before_decide(tmp_path: Path):
                 MoneySpawner(
                     currency="USD",
                     amount=1000,
-                    interval=SpawnInterval.MONTH,
+                    interval=ActionInterval.MONTH,
                 ),
             ],
         ),
@@ -501,7 +501,7 @@ def test_staker_pays_interest_on_period_minimum(tmp_path: Path):
         Experiment(
             SpendOnce(),
             modifiers=[
-                Staker(ticker="USD", rate="0.10", interval=SpawnInterval.MONTH),
+                Staker(ticker="USD", rate="0.10", interval=ActionInterval.MONTH),
             ],
         ),
         MockExecutor(),
