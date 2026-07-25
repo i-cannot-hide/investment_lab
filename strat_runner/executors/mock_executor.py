@@ -35,7 +35,17 @@ class MockExecutor:
             quantity = self._resolve_quantity(order, price)
 
             if order.side == OrderSide.BUY:
-                self._buy(order.ticker, quantity, price, account, positions)
+                # Value-sized buys debit total_value (not quantity*price) so
+                # Decimal division dust cannot overspend the intended cash.
+                spend = order.total_value
+                self._buy(
+                    order.ticker,
+                    quantity,
+                    price,
+                    account,
+                    positions,
+                    spend=spend,
+                )
             elif order.side == OrderSide.SELL:
                 self._sell(order.ticker, quantity, price, account, positions)
 
@@ -83,8 +93,10 @@ class MockExecutor:
         price: Decimal,
         account: Account,
         positions: list[Position],
+        *,
+        spend: Decimal | None = None,
     ):
-        cost = quantity * price
+        cost = spend if spend is not None else quantity * price
 
         if account.balances["USD"] < cost:
             raise ValueError(f"Not enough balance to buy {quantity} {ticker}")

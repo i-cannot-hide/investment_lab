@@ -12,17 +12,17 @@ from strategies.buy_when_ath import BuyWhenAthStrategy
 research = Research(
     name="Investing at ATH",
     experiments=[
-        Experiment(
-            InvestEverythingStrategy("SPX"),
-            name="invest_salary",
-            modifiers=[
-                MoneySpawner(
-                    currency="USD",
-                    amount=1000,
-                    interval=SpawnInterval.MONTH,
-                ),
-            ],
-        ),
+        # Experiment(
+        #     InvestEverythingStrategy("SPX"),
+        #     name="invest_salary",
+        #     modifiers=[
+        #         MoneySpawner(
+        #             currency="USD",
+        #             amount=1000,
+        #             interval=SpawnInterval.MONTH,
+        #         ),
+        #     ],
+        # ),
         Experiment(
             BuyWhenAthStrategy("SPX"),
             name="buy_when_ath_spx",

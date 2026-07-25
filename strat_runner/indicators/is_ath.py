@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field
 from decimal import Decimal
 
-from engine.journal import is_ath_entry
 from indicators.indicator import Indicator, IndicatorContext
 
 
@@ -36,6 +35,8 @@ class IsAth(Indicator):
             )
 
     def update(self, ctx: IndicatorContext) -> list[dict]:
+        from engine.journal import is_ath_entry
+
         candle = ctx.bar_candles.get(self.ticker)
         if candle is None:
             self.is_ath = None

@@ -73,6 +73,27 @@ def test_buy_by_total_value():
     assert positions[0].average_price == Decimal("100")
 
 
+def test_buy_by_total_value_debits_spend_not_quantity_times_price():
+    """Avoid (total_value / price) * price dust exceeding the cash balance."""
+    account = Account(balances={"USD": Decimal("3000")})
+    positions: list[Position] = []
+    executor = MockExecutor()
+    price = Decimal("2.37")
+    spend = Decimal("3000")
+    assert spend / price * price > spend
+
+    executor.execute(
+        [make_order(OrderSide.BUY, total_value=str(spend))],
+        account,
+        positions,
+        {"BTC": make_candle(str(price))},
+    )
+
+    assert account.balances["USD"] == Decimal("0")
+    assert positions[0].quantity == spend / price
+    assert positions[0].average_price == price
+
+
 def test_second_buy_merges_and_updates_average():
     account = Account(balances={"USD": Decimal("10000")})
     positions: list[Position] = []
