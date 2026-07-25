@@ -143,3 +143,88 @@ def test_hover_number_decimals():
         }
     )
     assert _hover_line(interest) == "INTEREST 40.13 USD"
+
+
+def test_hover_line_prefixes_experiment():
+    from analysis.plotter import _hover_line
+
+    entry = pd.Series(
+        {
+            "type": EntryType.DEPOSIT.value,
+            "currency": "USD",
+            "amount": "1000",
+            "experiment": "do-nothing_with_salary",
+        }
+    )
+    assert _hover_line(entry) == "do-nothing_with_salary: DEPOSIT 1000 USD"
+
+
+def test_collect_research_journal_and_price_attach():
+    from analysis.plotter import (
+        attach_journal_to_price,
+        collect_research_journal,
+        extract_ticker_ohlc,
+    )
+
+    def steps_with(ticker: str, journal: list[dict]) -> pd.DataFrame:
+        return pd.DataFrame(
+            [
+                {
+                    "time": datetime(2023, 1, 1),
+                    "candles": {
+                        ticker: {
+                            "open": "100",
+                            "high": "110",
+                            "low": "90",
+                            "close": "105",
+                        }
+                    },
+                    "journal": journal,
+                },
+                {
+                    "time": datetime(2023, 2, 1),
+                    "candles": {
+                        ticker: {
+                            "open": "105",
+                            "high": "120",
+                            "low": "100",
+                            "close": "115",
+                        }
+                    },
+                    "journal": [],
+                },
+            ]
+        )
+
+    outcomes = {
+        "a": steps_with(
+            "SPX",
+            [{"type": EntryType.DEPOSIT.value, "currency": "USD", "amount": "1000"}],
+        ),
+        "b": steps_with(
+            "SPX",
+            [
+                {
+                    "type": EntryType.ORDER_FILLED.value,
+                    "side": "BUY",
+                    "ticker": "SPX",
+                    "quantity": "1",
+                    "price": "105",
+                }
+            ],
+        ),
+    }
+    journal = collect_research_journal(
+        outcomes,
+        [EntryType.DEPOSIT.value, EntryType.ORDER_FILLED.value],
+    )
+    assert set(journal["experiment"]) == {"a", "b"}
+    assert len(journal) == 2
+
+    price = extract_ticker_ohlc(outcomes["a"], "SPX")
+    assert len(price) == 2
+    assert list(price.columns) == ["time", "open", "high", "low", "close"]
+
+    attached = attach_journal_to_price(price, journal)
+    assert len(attached.loc[0, "journal"]) == 2
+    assert attached.loc[1, "journal"] == []

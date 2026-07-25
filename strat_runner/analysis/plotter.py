@@ -179,22 +179,28 @@ def _hover_line(entry: pd.Series) -> str:
         if price is not None and pd.notna(price):
             # Fill prices are quote currency levels; keep 4 dp like other non-USD.
             parts.append(f"@ {_format_number(price, max_decimals=4)}")
-        return " ".join(parts)
-    if entry_type == EntryType.ORDER_CANCELLED.value:
-        return f"CANCEL {entry.get('order_id') or ''}".strip()
-    if entry_type == EntryType.DEPOSIT.value:
+        body = " ".join(parts)
+    elif entry_type == EntryType.ORDER_CANCELLED.value:
+        body = f"CANCEL {entry.get('order_id') or ''}".strip()
+    elif entry_type == EntryType.DEPOSIT.value:
         currency = entry.get("currency") or ""
         amount = _format_asset_amount(entry.get("amount"), asset=currency)
-        return f"DEPOSIT {amount} {currency}".strip()
-    if entry_type == EntryType.INTEREST.value:
+        body = f"DEPOSIT {amount} {currency}".strip()
+    elif entry_type == EntryType.INTEREST.value:
         ticker = entry.get("ticker") or ""
         amount = _format_asset_amount(entry.get("amount"), asset=ticker)
-        return f"INTEREST {amount} {ticker}".strip()
-    if entry_type == EntryType.WITHDRAWAL.value:
+        body = f"INTEREST {amount} {ticker}".strip()
+    elif entry_type == EntryType.WITHDRAWAL.value:
         currency = entry.get("currency") or ""
         amount = _format_asset_amount(entry.get("amount"), asset=currency)
-        return f"WITHDRAWAL {amount} {currency}".strip()
-    return str(entry_type or "event")
+        body = f"WITHDRAWAL {amount} {currency}".strip()
+    else:
+        body = str(entry_type or "event")
+
+    experiment = entry.get("experiment")
+    if experiment is not None and pd.notna(experiment) and str(experiment):
+        return f"{experiment}: {body}"
+    return body
 
 
 def _series_y_at(frame: pd.DataFrame, time, column: str) -> float | None:
@@ -424,6 +430,171 @@ def plot_series(
         }
         layout["margin"] = {"l": 60, "r": 20, "t": 30, "b": 140}
         layout[ENTRIES_LEGEND] = entries_legend
+    fig.update_layout(**layout)
+    fig.update_yaxes(type=scale.value, tickformat=",.0f")
+    fig.update_xaxes(tickformat="%Y-%m-%d", tickangle=-45)
+    fig.show()
+
+
+def extract_ticker_ohlc(steps: pd.DataFrame, ticker: str) -> pd.DataFrame:
+    """Rows where ``ticker`` appears in step ``candles``, as OHLC columns."""
+    rows: list[dict] = []
+    for _, step in steps.iterrows():
+        candle = (step.get("candles") or {}).get(ticker)
+        if not candle:
+            continue
+        rows.append(
+            {
+                "time": step["time"],
+                "open": float(candle["open"]),
+                "high": float(candle["high"]),
+                "low": float(candle["low"]),
+                "close": float(candle["close"]),
+            }
+        )
+    frame = pd.DataFrame(rows)
+    if frame.empty:
+        return frame
+    frame["time"] = pd.to_datetime(frame["time"])
+    return frame.reset_index(drop=True)
+
+
+def collect_research_journal(
+    outcomes: dict[str, pd.DataFrame],
+    entry_types: list[str] | None = None,
+) -> pd.DataFrame:
+    """Flatten journals from every experiment, tagged with ``experiment``."""
+    frames: list[pd.DataFrame] = []
+    type_set = set(entry_types) if entry_types else None
+    for name, steps in outcomes.items():
+        flat = flatten_journal(steps)
+        if flat.empty:
+            continue
+        if type_set is not None:
+            flat = flat[flat["type"].isin(type_set)]
+        if flat.empty:
+            continue
+        tagged = flat.copy()
+        tagged["experiment"] = name
+        frames.append(tagged)
+    if not frames:
+        return pd.DataFrame()
+    return pd.concat(frames, ignore_index=True)
+
+
+def attach_journal_to_price(
+    price: pd.DataFrame,
+    journal: pd.DataFrame,
+) -> pd.DataFrame:
+    """Attach per-time journal lists onto a price frame (events without a bar are dropped)."""
+    frame = price.copy()
+    frame["time"] = pd.to_datetime(frame["time"])
+    by_time: dict = {}
+    if not journal.empty:
+        for _, row in journal.iterrows():
+            key = pd.Timestamp(row["time"])
+            by_time.setdefault(key, []).append(row.to_dict())
+    frame["journal"] = [
+        by_time.get(pd.Timestamp(time), []) for time in frame["time"]
+    ]
+    return frame
+
+
+def plot_research_price(
+    outcomes: dict[str, pd.DataFrame],
+    ticker: str,
+    *,
+    bands: tuple[str, ...] = ("high", "low"),
+    journal: list[EntryType] | None = None,
+    scale: Scale = Scale.LOG,
+    figsize=(10, 5),
+):
+    """One shared price chart with journal markers from every experiment.
+
+    Price OHLC comes from steps that include ``ticker`` in ``candles``.
+    Journal entries from all experiments are overlaid once (hover lists
+    ``experiment: …`` for each event).
+    """
+    if not outcomes:
+        raise ValueError("outcomes is empty")
+    if not isinstance(scale, Scale):
+        raise TypeError(f"scale must be Scale, got {type(scale)!r}")
+    if not bands:
+        raise ValueError("bands must contain at least one OHLC field")
+
+    price = None
+    for steps in outcomes.values():
+        candidate = extract_ticker_ohlc(steps, ticker)
+        if not candidate.empty:
+            price = candidate
+            break
+    if price is None or price.empty:
+        raise ValueError(f"No candles found for ticker {ticker!r} in outcomes")
+
+    entry_types = _entry_type_values(journal)
+    research_journal = collect_research_journal(outcomes, entry_types or None)
+    frame = attach_journal_to_price(price, research_journal)
+
+    width = int(figsize[0] * 80)
+    height = int(figsize[1] * 80)
+    colors = qualitative.Plotly
+
+    markers: list[dict] = []
+    if entry_types:
+        entries = flatten_journal(frame)
+        if not entries.empty:
+            entries = entries[entries["type"].isin(entry_types)]
+            if not entries.empty:
+                # Place markers on the first band's y (shared market level).
+                markers = aggregate_journal_markers(entries, frame, bands[0])
+
+    fig = go.Figure()
+    shown_legend: set[str] = set()
+    customdata = series_journal_customdata(frame["time"], markers)
+    for index, band in enumerate(bands):
+        if band not in frame.columns:
+            raise ValueError(f"Unknown band {band!r}; have {list(frame.columns)}")
+        name = f"{ticker} {band}"
+        fig.add_trace(
+            go.Scatter(
+                x=frame["time"],
+                y=frame[band].astype(float),
+                mode="lines",
+                name=name,
+                legend=SERIES_LEGEND,
+                line={"color": colors[index % len(colors)]},
+                customdata=customdata if index == 0 else [""] * len(frame),
+                hovertemplate=(
+                    f"<b>{name}</b><br>{band}: "
+                    f"%{{y:{_series_y_hover_format(band)}}}"
+                    f"%{{customdata}}<extra></extra>"
+                ),
+            )
+        )
+
+    if markers:
+        _add_journal_traces(fig, markers, shown_legend=shown_legend)
+
+    series_legend = {"orientation": "h", "yanchor": "top", "y": -0.38, "x": 0}
+    layout = {
+        "width": width,
+        "height": height,
+        "hovermode": "x unified",
+        "margin": {"l": 60, "r": 20, "t": 30, "b": 100},
+        SERIES_LEGEND: series_legend,
+        "yaxis_title": f"{ticker} (log)" if scale is Scale.LOG else ticker,
+        "xaxis_title": None,
+        "plot_bgcolor": "#fafafa",
+        "paper_bgcolor": "#ffffff",
+    }
+    if shown_legend:
+        layout["margin"] = {"l": 60, "r": 20, "t": 30, "b": 140}
+        layout[ENTRIES_LEGEND] = {
+            "orientation": "h",
+            "yanchor": "top",
+            "y": -0.8,
+            "x": 0,
+        }
     fig.update_layout(**layout)
     fig.update_yaxes(type=scale.value, tickformat=",.0f")
     fig.update_xaxes(tickformat="%Y-%m-%d", tickangle=-45)

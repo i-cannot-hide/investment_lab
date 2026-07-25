@@ -8,7 +8,7 @@ from strategies.buy_below import BuyBelowStrategy
 
 
 research = Research(
-    name="hold-vs-buybelow",
+    name="Investing at ATH",
     experiments=[
         Experiment(
             strategy=DoNothingStrategy(),
@@ -25,59 +25,14 @@ research = Research(
                 ),
             ],
         ),
-        Experiment(
-            strategy=DoNothingStrategy(),
-            name="do-nothing_with_stake",
-            modifiers=[
-                Staker(ticker="USD", rate="0.004", interval=SpawnInterval.MONTH),
-            ],
-        ),
-        Experiment(
-            strategy=DoNothingStrategy(),
-            name="do-nothing_with_BTC_stake",
-            modifiers=[
-                Staker(ticker="BTC", rate="0.004", interval=SpawnInterval.MONTH),
-            ],
-        ),
-        Experiment(
-            strategy=HoldStrategy(ticker="BTC"),
-            name="hold",
-        ),
-        Experiment(
-            strategy=InvestEverythingStrategy(ticker="BTC"),
-            name="invest_everything",
-        ),
-        Experiment(
-            strategy=InvestEverythingStrategy(ticker="BTC"),
-            name="invest_everything+spawn",
-            modifiers=[
-                MoneySpawner(
-                    currency="USD",
-                    amount=1000,
-                    interval=SpawnInterval.MONTH,
-                ),
-            ],
-        ),
-        Experiment(
-            strategy=BuyBelowStrategy(target_price=20000, ticker="BTC"),
-            name="buybelow",
-        ),
-        Experiment(
-            strategy=BuyBelowStrategy(target_price=20000, ticker="BTC"),
-            name="buybelow+spawn",
-            modifiers=[
-                MoneySpawner(
-                    currency="USD",
-                    amount=1000,
-                    interval=SpawnInterval.MONTH,
-                ),
-            ],
+        Experiment(HoldStrategy("SPX"),
+            name="hold_spx",
         ),
     ],
 )
 
 data_dir = Path(__file__).parent / "data" / "preprocessed"
-data_files = sorted(str(path.relative_to(Path(__file__).parent)) for path in data_dir.glob("*.csv"))
+data_files = sorted(str(path.relative_to(Path(__file__).parent)) for path in data_dir.glob("SPX.csv"))
 
 if not data_files:
     raise FileNotFoundError(f"No CSV files found in {data_dir}")
@@ -85,7 +40,7 @@ if not data_files:
 research_id = research.run(
     data_files,
     full_debug_outcomes=False,
-    start_date="2021-02-20",
+    start_date="1980-02-20",
     end_date="2024-12-31",
     initial_usd=10_000,
 )
