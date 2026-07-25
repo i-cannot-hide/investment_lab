@@ -2,6 +2,7 @@ numpy>=2.0
 pandas>=2.2
 plotly>=5.24
 requests>=2.32
+yfinance>=0.2.40
 
 # dev / tests
 pytest>=8.2
