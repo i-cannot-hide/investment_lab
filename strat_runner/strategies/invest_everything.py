@@ -1,12 +1,13 @@
 from decimal import Decimal
 
 from models import Context, Decision, Order, OrderSide, OrderType
+from strategies.strategy import Strategy
 
 
 MIN_USD = Decimal("10.00")
 
 
-class InvestEverythingStrategy:
+class InvestEverythingStrategy(Strategy):
     def __init__(self, ticker: str = "BTC"):
         self.ticker = ticker
 

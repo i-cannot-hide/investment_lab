@@ -1,12 +1,13 @@
 from decimal import Decimal
 
 from models import Context, Decision, Order, OrderSide, OrderType
+from strategies.strategy import Strategy
 
 
 MIN_USD = Decimal("10.00")
 
 
-class BuyBelowStrategy:
+class BuyBelowStrategy(Strategy):
     def __init__(
         self,
         target_price: Decimal | float | str | int = 20000,
