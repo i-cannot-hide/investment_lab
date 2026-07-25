@@ -41,6 +41,33 @@ def test_flatten_and_aggregate_keeps_single_entry_style():
     assert markers[0]["count"] == 1
 
 
+def test_false_is_ath_entries_are_not_plotted():
+    steps = _steps(
+        [
+            {
+                "type": EntryType.IS_ATH.value,
+                "ticker": "SPX",
+                "IsATH": False,
+            }
+        ],
+        [
+            {
+                "type": EntryType.IS_ATH.value,
+                "ticker": "SPX",
+                "IsATH": True,
+            }
+        ],
+    )
+    frame = steps.copy()
+    frame["time"] = pd.to_datetime(frame["time"])
+    journal = flatten_journal(frame)
+    markers = aggregate_journal_markers(journal, frame, "equity")
+
+    assert len(markers) == 1
+    assert markers[0]["style"]["name"] == "ath"
+    assert markers[0]["hover"] == "ATH SPX"
+
+
 def test_same_day_entries_collapse_to_one_events_marker():
     steps = _steps(
         [
@@ -143,6 +170,15 @@ def test_hover_number_decimals():
         }
     )
     assert _hover_line(interest) == "INTEREST 40.13 USD"
+
+    ath = pd.Series(
+        {
+            "type": EntryType.IS_ATH.value,
+            "ticker": "SPX",
+            "IsATH": True,
+        }
+    )
+    assert _hover_line(ath) == "ATH SPX"
 
 
 def test_hover_line_prefixes_experiment():

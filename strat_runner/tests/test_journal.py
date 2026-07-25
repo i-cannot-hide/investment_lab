@@ -4,6 +4,7 @@ from engine.journal import (
     EntryType,
     deposit_entry,
     interest_entry,
+    is_ath_entry,
     order_cancelled_entry,
     order_filled_entry,
     withdrawal_entry,
@@ -36,6 +37,23 @@ def test_interest_entry():
         "amount": "40",
         "principal": "400",
         "rate": "0.1",
+    }
+
+
+def test_is_ath_entry():
+    assert is_ath_entry(
+        ticker="SPX",
+        is_ath=True,
+        high=Decimal("98"),
+        peak=Decimal("100"),
+        acceptable_drop=Decimal("0.02"),
+    ) == {
+        "type": EntryType.IS_ATH.value,
+        "ticker": "SPX",
+        "IsATH": True,
+        "high": "98",
+        "peak": "100",
+        "acceptable_drop": "0.02",
     }
 
 

@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from engine import Experiment, Research
-from modifiers import MoneySpawner, SpawnInterval, Staker
+from modifiers import IsAth, MoneySpawner, SpawnInterval, Staker
 from strategies.do_nothing import DoNothingStrategy
 from strategies.hold import HoldStrategy
 from strategies.invest_everything import InvestEverythingStrategy
@@ -28,6 +28,7 @@ research = Research(
         ),
         Experiment(HoldStrategy("SPX"),
             name="hold_spx",
+            modifiers=[IsAth(ticker="SPX", acceptable_drop=0.02)],
         ),
         Experiment(HoldStrategy("SPX"),
             name="hold_spx_with_salary",

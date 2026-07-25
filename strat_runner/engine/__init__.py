@@ -14,6 +14,7 @@ from engine.recorder import Recorder
 from engine.research import Research
 from modifiers import (
     ExperimentModifier,
+    IsAth,
     ModifierContext,
     MoneySpawner,
     SpawnInterval,
@@ -25,6 +26,7 @@ __all__ = [
     "Environment",
     "Experiment",
     "ExperimentModifier",
+    "IsAth",
     "ModifierContext",
     "MoneySpawner",
     "SpawnInterval",

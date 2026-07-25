@@ -77,6 +77,15 @@ _MARKER_STYLE = {
         "line_width": 1,
         "hover": "WITHDRAWAL",
     },
+    EntryType.IS_ATH.value: {
+        "name": "ath",
+        "symbol": "diamond",
+        "color": "#f9a825",
+        "size": 8,
+        "line_color": "#f57f17",
+        "line_width": 1,
+        "hover": "ATH",
+    },
 }
 
 _AGGREGATE_STYLE = {
@@ -128,8 +137,19 @@ def _marker_y(entry: pd.Series, frame: pd.DataFrame, column: str) -> float | Non
     return float(match.iloc[0])
 
 
-def _style_for_entry(entry: pd.Series) -> dict:
+def _is_ath_true(entry: pd.Series) -> bool:
+    value = entry.get("IsATH")
+    if isinstance(value, bool):
+        return value
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return False
+    return str(value).strip().lower() in {"true", "1", "yes"}
+
+
+def _style_for_entry(entry: pd.Series) -> dict | None:
     entry_type = entry.get("type")
+    if entry_type == EntryType.IS_ATH.value and not _is_ath_true(entry):
+        return None
     style = _MARKER_STYLE.get(entry_type)
     if style is None:
         return _AGGREGATE_STYLE
@@ -194,6 +214,10 @@ def _hover_line(entry: pd.Series) -> str:
         currency = entry.get("currency") or ""
         amount = _format_asset_amount(entry.get("amount"), asset=currency)
         body = f"WITHDRAWAL {amount} {currency}".strip()
+    elif entry_type == EntryType.IS_ATH.value:
+        ticker = entry.get("ticker") or ""
+        label = "ATH" if _is_ath_true(entry) else "not ATH"
+        body = f"{label} {ticker}".strip()
     else:
         body = str(entry_type or "event")
 
@@ -226,7 +250,13 @@ def aggregate_journal_markers(
     markers: list[dict] = []
     ordered = journal.sort_values("time", kind="mergesort")
     for time, group in ordered.groupby("time", sort=True):
-        rows = [row for _, row in group.iterrows()]
+        rows = [
+            row
+            for _, row in group.iterrows()
+            if _style_for_entry(row) is not None
+        ]
+        if not rows:
+            continue
         if len(rows) == 1:
             entry = rows[0]
             y = _marker_y(entry, frame, column)

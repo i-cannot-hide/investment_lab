@@ -10,6 +10,7 @@ class EntryType(Enum):
     DEPOSIT = "deposit"
     WITHDRAWAL = "withdrawal"
     INTEREST = "interest"
+    IS_ATH = "is_ath"
     ORDER_FILLED = "order_filled"
     ORDER_CANCELLED = "order_cancelled"
 
@@ -43,6 +44,24 @@ def withdrawal_entry(*, currency: str, amount: Decimal) -> dict:
         "type": EntryType.WITHDRAWAL.value,
         "currency": currency,
         "amount": str(amount),
+    }
+
+
+def is_ath_entry(
+    *,
+    ticker: str,
+    is_ath: bool,
+    high: Decimal,
+    peak: Decimal,
+    acceptable_drop: Decimal,
+) -> dict:
+    return {
+        "type": EntryType.IS_ATH.value,
+        "ticker": ticker,
+        "IsATH": is_ath,
+        "high": str(high),
+        "peak": str(peak),
+        "acceptable_drop": str(acceptable_drop),
     }
 
 
