@@ -28,6 +28,29 @@ research = Research(
         Experiment(HoldStrategy("SPX"),
             name="hold_spx",
         ),
+        Experiment(HoldStrategy("SPX"),
+            name="hold_spx_with_salary",
+            modifiers=[
+                MoneySpawner(
+                    currency="USD",
+                    amount=1000,
+                    interval=SpawnInterval.MONTH,
+                ),
+            ],
+        ),
+        Experiment(InvestEverythingStrategy("SPX"),
+            name="invest_everything_spx"
+        ),
+        Experiment(InvestEverythingStrategy("SPX"),
+            name="invest_everything_spx_with_salary",
+            modifiers=[
+                MoneySpawner(
+                    currency="USD",
+                    amount=1000,
+                    interval=SpawnInterval.MONTH,
+                ),
+            ],
+        ),
     ],
 )
 
