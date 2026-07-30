@@ -57,7 +57,11 @@ research = Research(
 )
 
 data_dir = Path(__file__).parent / "data" / "preprocessed"
-data_files = sorted(str(path.relative_to(Path(__file__).parent)) for path in data_dir.glob(f"{TICKER}.csv"))
+data_files = sorted(
+    str(path.relative_to(Path(__file__).parent))
+    for path in data_dir.glob("*.csv")
+    if path.stem.upper() == TICKER.upper()
+)
 
 if not data_files:
     raise FileNotFoundError(
