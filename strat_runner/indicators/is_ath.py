@@ -30,7 +30,7 @@ class IsAth(Indicator):
         self.acceptable_drop = Decimal(str(self.acceptable_drop))
         if self.acceptable_drop < 0 or self.acceptable_drop >= 1:
             raise ValueError(
-                "acceptable_drop must be in [0, 1), "
+                "acceptable_drop must be in [0, 1], "
                 f"got {self.acceptable_drop}"
             )
 
