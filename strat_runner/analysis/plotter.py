@@ -491,6 +491,8 @@ def plot_final_equity_bars(
             hovertemplate="<b>%{x}</b><br>" + column + ": %{y:,.2f}<extra></extra>",
         )
     )
+    min_bar = float(finals.min())
+    max_bar = float(finals.max())
     fig.update_layout(
         width=width,
         height=height,
@@ -501,7 +503,12 @@ def plot_final_equity_bars(
         paper_bgcolor="#ffffff",
         showlegend=False,
     )
-    fig.update_yaxes(tickformat=",.0f", rangemode="tozero")
+    # Floor at half the smallest bar so relative gaps are easier to see;
+    # pad the top for outside text labels.
+    fig.update_yaxes(
+        tickformat=",.0f",
+        range=[min_bar * 0.5, max_bar * 1.12],
+    )
     fig.update_xaxes(tickangle=-30)
     fig.show()
 
