@@ -9,13 +9,15 @@ from strategies.hold import HoldStrategy
 from strategies.invest_everything import InvestEverythingStrategy
 from strategies.buy_when_ath import BuyWhenAthStrategy
 
+TICKER = "SPX"  # Available prepared datasets: "BTC", "ETH", "SPX"
+
 ath_drop = 0.2
 
 research = Research(
     name="Investing at ATH",
     experiments=[
         Experiment(
-            InvestEverythingStrategy("SPX"),
+            InvestEverythingStrategy(TICKER),
             name="invest_salary",
             modifiers=[
                 MoneySpawner(
@@ -26,9 +28,9 @@ research = Research(
             ],
         ),
         Experiment(
-            BuyWhenAthStrategy("SPX", should_buy=False),
+            BuyWhenAthStrategy(TICKER, should_buy=False),
             name="skip_ath_staking",
-            indicators=[IsAth(ticker="SPX", acceptable_drop=ath_drop)],
+            indicators=[IsAth(ticker=TICKER, acceptable_drop=ath_drop)],
             modifiers=[
                 MoneySpawner(
                     currency="USD",
@@ -39,9 +41,9 @@ research = Research(
             ],
         ),
         Experiment(
-            BuyWhenAthStrategy("SPX"),
+            BuyWhenAthStrategy(TICKER),
             name="buy_ath_staking",
-            indicators=[IsAth(ticker="SPX", acceptable_drop=ath_drop)],
+            indicators=[IsAth(ticker=TICKER, acceptable_drop=ath_drop)],
             modifiers=[
                 MoneySpawner(
                     currency="USD",
@@ -55,10 +57,12 @@ research = Research(
 )
 
 data_dir = Path(__file__).parent / "data" / "preprocessed"
-data_files = sorted(str(path.relative_to(Path(__file__).parent)) for path in data_dir.glob("SPX.csv"))
+data_files = sorted(str(path.relative_to(Path(__file__).parent)) for path in data_dir.glob(f"{TICKER}.csv"))
 
 if not data_files:
-    raise FileNotFoundError(f"No CSV files found in {data_dir}")
+    raise FileNotFoundError(
+        f"No CSV file found for ticker {TICKER!r} in {data_dir}"
+    )
 
 research_id = research.run(
     data_files,
