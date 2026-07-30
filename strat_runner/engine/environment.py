@@ -1,4 +1,5 @@
 from collections import defaultdict
+import dataclasses
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
@@ -112,8 +113,8 @@ class Environment:
 
             indicator_ctx = IndicatorContext(
                 time=time,
-                bar_candles=current_candles,
-                history={
+                bar_candles=current_candles, # here and ...
+                history={  # ... here are the same vulnerabilites is at line 359
                     ticker: list(candles) for ticker, candles in history.items()
                 },
                 is_last_bar=is_last_bar,
@@ -355,8 +356,17 @@ class Environment:
         return Context(
             time=time,
             history={
-                ticker: list(candles) for ticker, candles in history.items()
+                ticker: [dataclasses.replace(candle) for candle in candles]  # (replace = copy)
+                for ticker, candles in history.items()
             },
+            # Before fix, only the dict and lists were copied. It is a shallow copy. The lists were new, 
+            # but Candle instances inside remained the same objects that were used by the engine.
+            # Thus Strategy could execute: context.history["BTC"][0].close = Decimal("999999")
+            # Alternatively, Candle can be made immutable avoiding the need for copies:
+            # @dataclass(frozen=True)
+            # class Candle:
+            #     ...
+
             current_open_prices=dict(current_open_prices),
             account=Account(balances=dict(self.account.balances)),
             positions=[

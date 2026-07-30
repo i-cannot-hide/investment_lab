@@ -536,7 +536,13 @@ def test_staker_pays_interest_on_period_minimum(tmp_path: Path):
 class MutatingStrategy:
     """Tries to corrupt engine state through the Context handed to decide()."""
 
+    def __init__(self):
+        self.first_history_closes: list[Decimal] = []
+
     def decide(self, context: Context) -> None:
+        if context.history.get("BTC"):
+            self.first_history_closes.append(context.history["BTC"][0].close)
+            context.history["BTC"][0].close = Decimal("999999")
         context.account.balances["USD"] = Decimal("0")
         context.positions.clear()
         context.history.setdefault("BTC", []).clear()
@@ -546,8 +552,9 @@ class MutatingStrategy:
 
 
 def test_context_mutations_do_not_affect_environment(tmp_path: Path, btc_csv: Path):
+    strategy = MutatingStrategy()
     environment = Environment(
-        Experiment(MutatingStrategy()),
+        Experiment(strategy),
         MockExecutor(),
         [str(btc_csv)],
         outcomes_dir=tmp_path / "outcomes",
@@ -557,6 +564,8 @@ def test_context_mutations_do_not_affect_environment(tmp_path: Path, btc_csv: Pa
     assert environment.account.balances["USD"] == Decimal("10000")
     assert environment.positions == []
     assert environment.open_orders == []
+    # Candle objects inside history are snapshots too, not engine-owned objects.
+    assert strategy.first_history_closes == [Decimal("110"), Decimal("110")]
     # History still advanced for every bar despite strategy clearing its copy.
     assert len(environment.recorder.folder.joinpath("steps.jsonl").read_text().splitlines()) == 3
 
