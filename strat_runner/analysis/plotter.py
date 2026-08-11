@@ -445,6 +445,7 @@ def _legend_layout(*, has_groups: bool) -> dict:
 def _show_figure(fig: go.Figure) -> None:
     import plotly.io as pio
 
+    fig.update_layout(template="plotly_dark")
     kwargs: dict = {"post_script": [_SERIES_LEGEND_CLICK_SCRIPT]}
     # plotly_mimetype drops post_script; force HTML so the series↔entries
     # legend hook actually runs in Jupyter / VS Code / Cursor notebooks.
@@ -499,8 +500,6 @@ def plot_final_equity_bars(
         margin={"l": 60, "r": 20, "t": 40, "b": 80},
         yaxis_title=f"final {column}",
         xaxis_title=None,
-        plot_bgcolor="#fafafa",
-        paper_bgcolor="#ffffff",
         showlegend=False,
     )
     # Floor at half the smallest bar so relative gaps are easier to see;
@@ -510,7 +509,7 @@ def plot_final_equity_bars(
         range=[min_bar * 0.5, max_bar * 1.12],
     )
     fig.update_xaxes(tickangle=-30)
-    fig.show()
+    _show_figure(fig)
 
 
 def plot_series(
@@ -595,8 +594,6 @@ def plot_series(
         SERIES_LEGEND: _legend_layout(has_groups=True),
         "yaxis_title": f"{column} (log)" if scale is Scale.LOG else column,
         "xaxis_title": None,
-        "plot_bgcolor": "#fafafa",
-        "paper_bgcolor": "#ffffff",
     }
     fig.update_layout(**layout)
     fig.update_yaxes(type=scale.value, tickformat=",.0f")
@@ -784,8 +781,6 @@ def plot_research_price(
         SERIES_LEGEND: _legend_layout(has_groups=True),
         "yaxis_title": f"{ticker} (log)" if scale is Scale.LOG else ticker,
         "xaxis_title": None,
-        "plot_bgcolor": "#fafafa",
-        "paper_bgcolor": "#ffffff",
     }
     fig.update_layout(**layout)
     fig.update_yaxes(type=scale.value, tickformat=",.0f")
