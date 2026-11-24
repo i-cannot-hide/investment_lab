@@ -23,7 +23,7 @@ _FILE_STEM = {
     "^GSPC": "SPX",
     "GSPC": "SPX",
     "SNP500": "SPX",
-    "EURUSD=X": "EURUSD",
+    "EURUSD=X": "EUR",
 }
 
 

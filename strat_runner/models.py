@@ -51,7 +51,9 @@ class Order:
         has_value = self.total_value is not None
 
         if has_quantity == has_value:
-            raise ValueError("Order must specify exactly one of quantity or total_value")
+            raise ValueError(
+                "Order must specify exactly one of quantity or total_value"
+            )
 
         if (self.order_type == OrderType.MARKET) and (self.price is not None):
             raise ValueError("Market orders must not include price")

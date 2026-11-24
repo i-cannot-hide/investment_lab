@@ -11,9 +11,9 @@ def run() -> str:
         experiments=[
             Experiment(
                 GridStrategy(
-                    min_price=100,
-                    max_price=400,
-                    num_of_lines=4,
+                    min_price=0.5,
+                    max_price=2,
+                    num_of_lines=8,
                     ticker="EUR",
                 ),
                 name="grid",
@@ -24,7 +24,7 @@ def run() -> str:
     strat_runner_dir = Path(__file__).resolve().parent.parent
     data_dir = strat_runner_dir / "data" / "preprocessed"
     data_files = sorted(
-        str(path.relative_to(strat_runner_dir)) for path in data_dir.glob("SPX.csv")
+        str(path.relative_to(strat_runner_dir)) for path in data_dir.glob("eur.csv")
     )
 
     if not data_files:
