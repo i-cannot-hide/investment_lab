@@ -106,17 +106,26 @@ class Context:
     @overload
     def position_price(self, position: str) -> Decimal: ...
 
+    def _held_position(self, ticker: str) -> Position:
+        held = next(
+            (item for item in self.positions if item.ticker == ticker),
+            None,
+        )
+        if held is None:
+            raise ValueError(f"No position for {ticker}")
+        return held
+
+    def _reserved_quantity(self, ticker: str) -> Decimal:
+        total = Decimal("0")
+        for order in self.open_orders:
+            if order.ticker == ticker and order.reserved_quantity is not None:
+                total += order.reserved_quantity
+        return total
+
     def position_price(self, position: Position | str) -> Decimal:
         """Mark-to-market value: quantity times the current open price."""
         if isinstance(position, str):
-            ticker = position
-            held = next(
-                (item for item in self.positions if item.ticker == ticker),
-                None,
-            )
-            if held is None:
-                raise ValueError(f"No position for {ticker}")
-            return self.position_price(held)
+            return self.position_price(self._held_position(position))
 
         price = self.current_open_prices.get(position.ticker)
         if price is None:
@@ -132,6 +141,27 @@ class Context:
     def position_value(self, position: Position | str) -> Decimal:
         """USD value of a position at the current open."""
         return self.position_price(position)
+
+    @overload
+    def position_qty(self, position: Position) -> Decimal: ...
+
+    @overload
+    def position_qty(self, position: str) -> Decimal: ...
+
+    def position_qty(self, position: Position | str) -> Decimal:
+        """Owned quantity, including coins reserved on open sell orders."""
+        if isinstance(position, str):
+            ticker = position
+            held = next(
+                (item for item in self.positions if item.ticker == ticker),
+                None,
+            )
+            reserved = self._reserved_quantity(ticker)
+            if held is None and reserved == 0:
+                raise ValueError(f"No position for {ticker}")
+            free = held.quantity if held is not None else Decimal("0")
+            return free + reserved
+        return position.quantity + self._reserved_quantity(position.ticker)
 
     def portfolio_value(self) -> Decimal:
         """USD value of cash, holdings, and reserved coins at the current open."""

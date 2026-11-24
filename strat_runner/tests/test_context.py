@@ -140,3 +140,56 @@ def test_portfolio_value_includes_reserved_coins():
     context = make_context(usd="10000", open_orders=[order])
 
     assert context.portfolio_value() == Decimal("10004.8")
+
+
+def test_position_qty_returns_quantity():
+    position = Position(
+        ticker="EUR",
+        quantity=Decimal("10"),
+        average_price=Decimal("1.1"),
+    )
+    context = make_context(positions=[position])
+
+    assert context.position_qty(position) == Decimal("10")
+    assert context.position_qty("EUR") == Decimal("10")
+
+
+def test_position_qty_includes_reserved_coins():
+    position = Position(
+        ticker="EUR",
+        quantity=Decimal("10"),
+        average_price=Decimal("1.1"),
+    )
+    order = Order(
+        ticker="EUR",
+        side=OrderSide.SELL,
+        order_type=OrderType.LIMIT,
+        quantity=Decimal("4"),
+        price=Decimal("1.3"),
+        reserved_quantity=Decimal("4"),
+    )
+    context = make_context(positions=[position], open_orders=[order])
+
+    assert context.position_qty(position) == Decimal("14")
+    assert context.position_qty("EUR") == Decimal("14")
+
+
+def test_position_qty_by_ticker_when_all_coins_are_reserved():
+    order = Order(
+        ticker="EUR",
+        side=OrderSide.SELL,
+        order_type=OrderType.LIMIT,
+        quantity=Decimal("4"),
+        price=Decimal("1.3"),
+        reserved_quantity=Decimal("4"),
+    )
+    context = make_context(open_orders=[order])
+
+    assert context.position_qty("EUR") == Decimal("4")
+
+
+def test_position_qty_by_ticker_raises_when_missing():
+    context = make_context()
+
+    with pytest.raises(ValueError, match="EUR"):
+        context.position_qty("EUR")

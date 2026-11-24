@@ -11,8 +11,8 @@ def run() -> str:
         experiments=[
             Experiment(
                 GridStrategy(
-                    min_price=0.5,
-                    max_price=2,
+                    min_price=0.8,
+                    max_price=1.8,
                     num_of_lines=8,
                     ticker="EUR",
                 ),

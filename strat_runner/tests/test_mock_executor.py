@@ -304,7 +304,7 @@ def test_limit_buy_fills_at_limit_price_when_low_touches():
         ticker="BTC",
         side=OrderSide.BUY,
         order_type=OrderType.LIMIT,
-        quantity=Decimal("1"),
+        quantity=Decimal("2"),
         price=Decimal("90"),
     )
 
@@ -316,7 +316,27 @@ def test_limit_buy_fills_at_limit_price_when_low_touches():
     )
 
     assert positions[0].average_price == Decimal("90")
-    assert account.balances["USD"] == Decimal("910")
+    assert positions[0].quantity == Decimal("2")
+    assert account.balances["USD"] == Decimal("820")
+
+    order = Order(
+        ticker="BTC",
+        side=OrderSide.BUY,
+        order_type=OrderType.LIMIT,
+        quantity=Decimal("4"),
+        price=Decimal("90"),
+    )
+
+    executor.execute(
+        [order],
+        account,
+        positions,
+        {"BTC": make_ohlc_candle(open_="100", high="110", low="85", close="105")},
+    )
+
+    assert positions[0].average_price == Decimal("90")
+    assert positions[0].quantity == Decimal("6")
+    assert account.balances["USD"] == Decimal("460")
 
 
 def test_limit_buy_does_not_fill_when_low_stays_above():
@@ -383,7 +403,11 @@ def test_limit_buy_fills_at_open_when_gap_through_limit():
         [order],
         account,
         positions,
-        {"BTC": make_ohlc_candle(open_="15000", high="16000", low="14000", close="15500")},
+        {
+            "BTC": make_ohlc_candle(
+                open_="15000", high="16000", low="14000", close="15500"
+            )
+        },
     )
 
     assert positions[0].average_price == Decimal("15000")
