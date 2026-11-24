@@ -16,12 +16,14 @@ _YAHOO_SYMBOLS = {
     "GSPC": "^GSPC",
     "SNP500": "^GSPC",
     "^GSPC": "^GSPC",
+    "EUR": "EURUSD=X",
 }
 
 _FILE_STEM = {
     "^GSPC": "SPX",
     "GSPC": "SPX",
     "SNP500": "SPX",
+    "EURUSD=X": "EURUSD",
 }
 
 

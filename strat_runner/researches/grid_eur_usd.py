@@ -14,7 +14,7 @@ def run() -> str:
                     min_price=100,
                     max_price=400,
                     num_of_lines=4,
-                    ticker="SPX",
+                    ticker="EUR",
                 ),
                 name="grid",
             ),
