@@ -50,7 +50,7 @@ class GridStrategy(Strategy):
         target_asset_share = 1 - target_usd_share
 
         # сколько должно быть usd
-        target_usd_amount = context.account.balances["USD"] * Decimal(target_usd_share)
+        target_usd_amount = context.portfolio_value() * Decimal(target_usd_share)
 
         # сколько должно быть asset (в usd)
         target_asset_value = (
@@ -76,8 +76,6 @@ class GridStrategy(Strategy):
                     )
                 ]
             )
-
-        asset_amount = context.positions[context.positions.index(self.ticker)].quantity
 
         # if self.buy_order is None or not context.open_orders.contains(
         #     self.buy_order.id

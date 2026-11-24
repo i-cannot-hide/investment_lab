@@ -3,6 +3,7 @@ from datetime import datetime
 from enum import Enum
 from decimal import Decimal
 from itertools import count
+from typing import overload
 
 
 class OrderSide(Enum):
@@ -98,3 +99,51 @@ class Context:
     positions: list[Position]
     open_orders: list[Order] = field(default_factory=list)
     indicators: list = field(default_factory=list)
+
+    @overload
+    def position_price(self, position: Position) -> Decimal: ...
+
+    @overload
+    def position_price(self, position: str) -> Decimal: ...
+
+    def position_price(self, position: Position | str) -> Decimal:
+        """Mark-to-market value: quantity times the current open price."""
+        if isinstance(position, str):
+            ticker = position
+            held = next(
+                (item for item in self.positions if item.ticker == ticker),
+                None,
+            )
+            if held is None:
+                raise ValueError(f"No position for {ticker}")
+            return self.position_price(held)
+
+        price = self.current_open_prices.get(position.ticker)
+        if price is None:
+            raise ValueError(f"No current open price for {position.ticker}")
+        return position.quantity * price
+
+    @overload
+    def position_value(self, position: Position) -> Decimal: ...
+
+    @overload
+    def position_value(self, position: str) -> Decimal: ...
+
+    def position_value(self, position: Position | str) -> Decimal:
+        """USD value of a position at the current open."""
+        return self.position_price(position)
+
+    def portfolio_value(self) -> Decimal:
+        """USD value of cash, holdings, and reserved coins at the current open."""
+        total = self.account.balances.get("USD", Decimal("0"))
+        for order in self.open_orders:
+            if order.reserved_cash is not None:
+                total += order.reserved_cash
+            if order.reserved_quantity is not None:
+                price = self.current_open_prices.get(order.ticker)
+                if price is None:
+                    raise ValueError(f"No current open price for {order.ticker}")
+                total += order.reserved_quantity * price
+        for held in self.positions:
+            total += self.position_value(held)
+        return total
